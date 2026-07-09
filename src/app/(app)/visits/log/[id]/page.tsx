@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ContactFormDialog } from "@/components/contact-form-dialog";
 import { OpportunityFormDialog } from "@/components/opportunity-form-dialog";
+import { ScanCardButton } from "@/components/scan-card-button";
 
 export default async function LogVisitPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -94,7 +95,8 @@ export default async function LogVisitPage({ params }: { params: Promise<{ id: s
         </Button>
       </form>
 
-      <div className="flex items-center justify-center gap-3 border-t pt-4">
+      <div className="flex flex-wrap items-center justify-center gap-3 border-t pt-4">
+        <ScanCardButton locationId={location.id} />
         <ContactFormDialog locationId={location.id} />
         <OpportunityFormDialog locationId={location.id} contacts={contacts} defaultKind={defaultOpportunityKind} />
       </div>

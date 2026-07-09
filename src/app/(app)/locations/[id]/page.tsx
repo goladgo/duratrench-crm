@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ContactFormDialog } from "@/components/contact-form-dialog";
+import { ScanCardButton } from "@/components/scan-card-button";
 import { VisitNoteFormDialog } from "@/components/visit-note-form-dialog";
 import { OpportunityFormDialog } from "@/components/opportunity-form-dialog";
 import type { LocationStatus, OpportunityStage } from "@/lib/types";
@@ -76,7 +77,8 @@ export default async function LocationProfilePage({ params }: { params: Promise<
         </TabsList>
 
         <TabsContent value="contacts" className="space-y-3 pt-4">
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
+            <ScanCardButton locationId={location.id} />
             <ContactFormDialog locationId={location.id} />
           </div>
           {contacts.length === 0 ? (
