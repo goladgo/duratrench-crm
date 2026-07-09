@@ -2,6 +2,7 @@ import Link from "next/link";
 import { listLocations } from "@/lib/queries/locations";
 import { listAllCompaniesForPicker } from "@/lib/queries/companies";
 import { LocationFormDialog } from "@/components/location-form-dialog";
+import { SmartScanButton } from "@/components/smart-scan-button";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -32,6 +33,14 @@ export default async function NewVisitPage({
           Visit saved. Ready for the next stop.
         </div>
       )}
+
+      <SmartScanButton />
+
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <div className="h-px flex-1 bg-border" />
+        or find/add it manually
+        <div className="h-px flex-1 bg-border" />
+      </div>
 
       <form action="/visits/new" className="flex gap-2">
         <div className="relative flex-1">

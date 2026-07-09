@@ -2,14 +2,21 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 
+export interface ScannedCard {
+  name: string;
+  title: string;
+  phone: string;
+  email: string;
+  company: string;
+  address: string;
+  city: string;
+  state: string;
+  zip: string;
+}
+
 export interface ScanCardResult {
   error?: string;
-  data?: {
-    name: string;
-    title: string;
-    phone: string;
-    email: string;
-  };
+  data?: ScannedCard;
 }
 
 const client = new Anthropic();
@@ -35,7 +42,7 @@ export async function scanBusinessCard(formData: FormData): Promise<ScanCardResu
             },
             {
               type: "text",
-              text: "Extract the contact's name, job title, phone number, and email address from this business card photo. Use an empty string for any field that isn't visible on the card.",
+              text: "Extract the contact's name, job title, phone number, email address, company name, and the office street address, city, state, and zip code from this business card photo. Use an empty string for any field that isn't visible on the card.",
             },
           ],
         },
@@ -50,8 +57,13 @@ export async function scanBusinessCard(formData: FormData): Promise<ScanCardResu
               title: { type: "string" },
               phone: { type: "string" },
               email: { type: "string" },
+              company: { type: "string" },
+              address: { type: "string" },
+              city: { type: "string" },
+              state: { type: "string" },
+              zip: { type: "string" },
             },
-            required: ["name", "title", "phone", "email"],
+            required: ["name", "title", "phone", "email", "company", "address", "city", "state", "zip"],
             additionalProperties: false,
           },
         },
