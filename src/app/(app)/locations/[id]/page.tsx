@@ -9,6 +9,7 @@ import { ScanCardButton } from "@/components/scan-card-button";
 import { VisitNoteFormDialog } from "@/components/visit-note-form-dialog";
 import { OpportunityFormDialog } from "@/components/opportunity-form-dialog";
 import { DeleteButton } from "@/components/delete-button";
+import { LunchLearnCard } from "@/components/lunch-learn-card";
 import { deleteContact } from "@/lib/actions/contacts";
 import { deleteVisitNote } from "@/lib/actions/visits";
 import { deleteLocation } from "@/lib/actions/locations";
@@ -46,6 +47,7 @@ export default async function LocationProfilePage({ params }: { params: Promise<
   if (!location) notFound();
 
   const defaultOpportunityKind = location.companies?.category && location.companies.category !== "distributor" ? "spec" : "quote";
+  const isDesignFirm = !!location.companies?.category && location.companies.category !== "distributor";
 
   return (
     <div className="space-y-6">
@@ -80,6 +82,14 @@ export default async function LocationProfilePage({ params }: { params: Promise<
           confirmMessage={`Delete "${location.name}"? This also deletes its ${contacts.length} contact(s), ${visitNotes.length} visit note(s), and ${opportunities.length} quote(s)/spec(s). This can't be undone.`}
         />
       </div>
+
+      {isDesignFirm && (
+        <LunchLearnCard
+          locationId={location.id}
+          completedAt={location.lunch_learn_completed_at}
+          scheduledAt={location.lunch_learn_scheduled_at}
+        />
+      )}
 
       <Tabs defaultValue="contacts">
         <TabsList>

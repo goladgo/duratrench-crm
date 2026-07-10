@@ -181,6 +181,7 @@ export function SmartScanButton({
                     <SelectItem value="distributor">Distributor</SelectItem>
                     <SelectItem value="civil_engineering">Civil Engineering</SelectItem>
                     <SelectItem value="landscape_architecture">Landscape Architecture</SelectItem>
+                    <SelectItem value="contractor">Contractor</SelectItem>
                   </SelectContent>
                 </Select>
                 <div className="space-y-2">

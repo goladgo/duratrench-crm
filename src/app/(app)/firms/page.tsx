@@ -11,7 +11,10 @@ import type { CompanyCategory } from "@/lib/types";
 const CATEGORY_LABELS = {
   civil_engineering: "Civil Engineering",
   landscape_architecture: "Landscape Architecture",
+  contractor: "Contractor",
 } as const;
+
+const FIRM_CATEGORIES: CompanyCategory[] = ["civil_engineering", "landscape_architecture", "contractor"];
 
 export default async function FirmsPage({
   searchParams,
@@ -20,10 +23,7 @@ export default async function FirmsPage({
 }) {
   const params = await searchParams;
   const type = params.type as CompanyCategory | undefined;
-  const categories: CompanyCategory[] =
-    type === "civil_engineering" || type === "landscape_architecture"
-      ? [type]
-      : ["civil_engineering", "landscape_architecture"];
+  const categories: CompanyCategory[] = type && FIRM_CATEGORIES.includes(type) ? [type] : FIRM_CATEGORIES;
 
   const rows = await listCompanies(categories, params.q);
 
@@ -41,12 +41,9 @@ export default async function FirmsPage({
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Design Firms</h1>
-          <p className="text-muted-foreground">Civil engineers &amp; landscape architects</p>
+          <p className="text-muted-foreground">Civil engineers, landscape architects &amp; contractors</p>
         </div>
-        <CompanyFormDialog
-          categories={["civil_engineering", "landscape_architecture"]}
-          triggerLabel="Add Firm"
-        />
+        <CompanyFormDialog categories={FIRM_CATEGORIES} triggerLabel="Add Firm" />
       </div>
 
       <SmartScanButton defaultCategory="civil_engineering" triggerLabel="Scan a Firm's Business Card" />
@@ -69,10 +66,13 @@ export default async function FirmsPage({
         <Link href={filterLink({ type: "landscape_architecture" })}>
           <Badge variant={type === "landscape_architecture" ? "default" : "outline"}>Landscape Architecture</Badge>
         </Link>
+        <Link href={filterLink({ type: "contractor" })}>
+          <Badge variant={type === "contractor" ? "default" : "outline"}>Contractor</Badge>
+        </Link>
       </div>
 
       {rows.length === 0 ? (
-        <p className="text-muted-foreground">No firms yet. Add a civil engineering or landscape architecture firm.</p>
+        <p className="text-muted-foreground">No firms yet. Add a civil engineering, landscape architecture, or contractor firm.</p>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {rows.map(({ company, rollup }) => (

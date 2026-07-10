@@ -74,3 +74,17 @@ export async function deleteLocation(locationId: string, companyId: string | nul
   if (companyId) revalidatePath(`/companies/${companyId}`);
   redirect("/locations");
 }
+
+export async function updateLunchLearn(
+  locationId: string,
+  completedAt: string | null,
+  scheduledAt: string | null
+): Promise<{ error?: string } | void> {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("locations")
+    .update({ lunch_learn_completed_at: completedAt, lunch_learn_scheduled_at: scheduledAt })
+    .eq("id", locationId);
+  if (error) return { error: error.message };
+  revalidatePath(`/locations/${locationId}`);
+}

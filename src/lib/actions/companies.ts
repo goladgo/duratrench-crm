@@ -18,7 +18,7 @@ export async function createCompany(_prevState: FormState, formData: FormData): 
   const redirectTo = String(formData.get("redirectTo") ?? "");
 
   if (!name) return { error: "Name is required." };
-  if (!["distributor", "civil_engineering", "landscape_architecture"].includes(category)) {
+  if (!["distributor", "civil_engineering", "landscape_architecture", "contractor"].includes(category)) {
     return { error: "Choose a valid category." };
   }
 

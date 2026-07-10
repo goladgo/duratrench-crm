@@ -12,6 +12,7 @@ const CATEGORY_LABELS = {
   distributor: "Distributor",
   civil_engineering: "Civil Engineering",
   landscape_architecture: "Landscape Architecture",
+  contractor: "Contractor",
 } as const;
 
 const STATUS_VARIANT: Record<LocationStatus, "default" | "secondary" | "outline"> = {

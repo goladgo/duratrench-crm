@@ -22,6 +22,7 @@ const CATEGORY_LABELS: Record<CompanyCategory, string> = {
   distributor: "Distributor",
   civil_engineering: "Civil Engineering",
   landscape_architecture: "Landscape Architecture",
+  contractor: "Contractor",
 };
 
 const initialState: FormState = {};

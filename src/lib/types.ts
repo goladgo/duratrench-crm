@@ -1,4 +1,4 @@
-export type CompanyCategory = "distributor" | "civil_engineering" | "landscape_architecture";
+export type CompanyCategory = "distributor" | "civil_engineering" | "landscape_architecture" | "contractor";
 export type DistributorType = "waterworks" | "plumbing" | "both";
 export type TerritoryRegion = "socal" | "vegas";
 export type LocationStatus = "prospect" | "active" | "inactive";
@@ -29,6 +29,8 @@ export interface Location {
   distributor_type: DistributorType | null;
   territory_region: TerritoryRegion;
   status: LocationStatus;
+  lunch_learn_completed_at: string | null;
+  lunch_learn_scheduled_at: string | null;
   created_at: string;
   updated_at: string;
 }
