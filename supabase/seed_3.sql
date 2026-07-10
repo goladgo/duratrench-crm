@@ -27,7 +27,7 @@ declare
   v_winsupply uuid;
   v_five_star uuid;
 begin
-  select id into v_rep_id from auth.users where email = 'REPLACE_WITH_YOUR_EMAIL';
+  select id into v_rep_id from auth.users where email = 'albertq31@gmail.com';
   if v_rep_id is null then
     raise exception 'No auth user found for that email — update the email in supabase/seed_3.sql';
   end if;

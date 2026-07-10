@@ -14,6 +14,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { createContact, type FormState } from "@/lib/actions/contacts";
 import { scanBusinessCard } from "@/lib/actions/scan-card";
+import { resizeImageToBase64 } from "@/lib/image-resize";
+import { withTimeout } from "@/lib/with-timeout";
 import { Camera, Loader2 } from "lucide-react";
 
 const initialState: FormState = {};
@@ -38,29 +40,27 @@ export function ScanCardButton({ locationId }: { locationId: string }) {
     setScanning(true);
     setScanError(null);
 
-    const dataUrl = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = () => reject(reader.error);
-      reader.readAsDataURL(file);
-    });
-    const base64Data = dataUrl.slice(dataUrl.indexOf(",") + 1);
+    try {
+      const { base64, mediaType } = await resizeImageToBase64(file);
 
-    const formData = new FormData();
-    formData.append("photoBase64", base64Data);
-    formData.append("mediaType", file.type || "image/jpeg");
-    const result = await scanBusinessCard(formData);
+      const formData = new FormData();
+      formData.append("photoBase64", base64);
+      formData.append("mediaType", mediaType);
+      const result = await withTimeout(scanBusinessCard(formData), 25000, "Scan timed out — check your connection and try again.");
 
-    setScanning(false);
-    e.target.value = "";
-
-    if (result.error) {
-      setScanError(result.error);
-      return;
-    }
-    if (result.data) {
-      setExtracted(result.data);
-      setOpen(true);
+      if (result.error) {
+        setScanError(result.error);
+        return;
+      }
+      if (result.data) {
+        setExtracted(result.data);
+        setOpen(true);
+      }
+    } catch (err) {
+      setScanError(err instanceof Error ? err.message : "Scan failed. Try again.");
+    } finally {
+      setScanning(false);
+      e.target.value = "";
     }
   }
 

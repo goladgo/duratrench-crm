@@ -17,6 +17,8 @@ import { Badge } from "@/components/ui/badge";
 import { scanBusinessCard, type ScannedCard } from "@/lib/actions/scan-card";
 import { matchScan, type ScanMatchResult } from "@/lib/actions/scan-match";
 import { createFromScan, type ResolveScanResult } from "@/lib/actions/scan-resolve";
+import { resizeImageToBase64 } from "@/lib/image-resize";
+import { withTimeout } from "@/lib/with-timeout";
 import { Camera, Loader2, CheckCircle2 } from "lucide-react";
 import type { CompanyCategory } from "@/lib/types";
 
@@ -52,33 +54,35 @@ export function SmartScanButton() {
     setBusy(true);
     setScanError(null);
 
-    const dataUrl = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = () => reject(reader.error);
-      reader.readAsDataURL(file);
-    });
-    const base64Data = dataUrl.slice(dataUrl.indexOf(",") + 1);
+    try {
+      const { base64, mediaType } = await resizeImageToBase64(file);
 
-    const scanForm = new FormData();
-    scanForm.append("photoBase64", base64Data);
-    scanForm.append("mediaType", file.type || "image/jpeg");
-    const scanResult = await scanBusinessCard(scanForm);
-    e.target.value = "";
+      const scanForm = new FormData();
+      scanForm.append("photoBase64", base64);
+      scanForm.append("mediaType", mediaType);
+      const scanResult = await withTimeout(scanBusinessCard(scanForm), 25000, "Scan timed out — check your connection and try again.");
 
-    if (scanResult.error || !scanResult.data) {
+      if (scanResult.error || !scanResult.data) {
+        setScanError(scanResult.error ?? "Couldn't read the card.");
+        return;
+      }
+
+      const matchResult = await withTimeout(
+        matchScan(scanResult.data.company, scanResult.data.city),
+        10000,
+        "Lookup timed out — check your connection and try again."
+      );
+
+      setCard(scanResult.data);
+      setMatch(matchResult);
+      setMode(matchResult.location ? "existing_location" : matchResult.company ? "new_branch" : "new_company");
+      setOpen(true);
+    } catch (err) {
+      setScanError(err instanceof Error ? err.message : "Scan failed. Try again.");
+    } finally {
       setBusy(false);
-      setScanError(scanResult.error ?? "Couldn't read the card.");
-      return;
+      e.target.value = "";
     }
-
-    const matchResult = await matchScan(scanResult.data.company, scanResult.data.city);
-
-    setCard(scanResult.data);
-    setMatch(matchResult);
-    setMode(matchResult.location ? "existing_location" : matchResult.company ? "new_branch" : "new_company");
-    setBusy(false);
-    setOpen(true);
   }
 
   return (
