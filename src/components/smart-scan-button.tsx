@@ -28,7 +28,13 @@ function regionForState(state: string): "socal" | "vegas" {
   return state.trim().toUpperCase() === "NV" ? "vegas" : "socal";
 }
 
-export function SmartScanButton() {
+export function SmartScanButton({
+  defaultCategory = "distributor",
+  triggerLabel = "Scan a Business Card",
+}: {
+  defaultCategory?: CompanyCategory;
+  triggerLabel?: string;
+}) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -97,7 +103,7 @@ export function SmartScanButton() {
       />
       <Button size="lg" className="w-full" type="button" disabled={busy} onClick={() => fileInputRef.current?.click()}>
         {busy ? <Loader2 className="size-4 animate-spin" /> : <Camera className="size-4" />}
-        {busy ? "Reading card..." : "Scan a Business Card"}
+        {busy ? "Reading card..." : triggerLabel}
       </Button>
       {scanError && <p className="mt-1 text-center text-sm text-destructive">{scanError}</p>}
 
@@ -167,7 +173,7 @@ export function SmartScanButton() {
                   <Label htmlFor="scan-company-name">Company</Label>
                   <Input id="scan-company-name" name="company_name" defaultValue={card?.company} key={`cn-${card?.company}`} required />
                 </div>
-                <Select name="category" defaultValue={"distributor" as CompanyCategory}>
+                <Select name="category" defaultValue={defaultCategory}>
                   <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>

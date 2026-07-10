@@ -8,6 +8,10 @@ import { ContactFormDialog } from "@/components/contact-form-dialog";
 import { ScanCardButton } from "@/components/scan-card-button";
 import { VisitNoteFormDialog } from "@/components/visit-note-form-dialog";
 import { OpportunityFormDialog } from "@/components/opportunity-form-dialog";
+import { DeleteButton } from "@/components/delete-button";
+import { deleteContact } from "@/lib/actions/contacts";
+import { deleteVisitNote } from "@/lib/actions/visits";
+import { deleteLocation } from "@/lib/actions/locations";
 import type { LocationStatus, OpportunityStage } from "@/lib/types";
 
 const STATUS_VARIANT: Record<LocationStatus, "default" | "secondary" | "outline"> = {
@@ -45,26 +49,36 @@ export default async function LocationProfilePage({ params }: { params: Promise<
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant={STATUS_VARIANT[location.status]}>{location.status}</Badge>
-          <Badge variant="outline">{location.territory_region === "socal" ? "SoCal" : "Las Vegas"}</Badge>
-          {location.distributor_type && <Badge variant="outline">{location.distributor_type}</Badge>}
+      <div className="flex items-start justify-between gap-2">
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant={STATUS_VARIANT[location.status]}>{location.status}</Badge>
+            <Badge variant="outline">{location.territory_region === "socal" ? "SoCal" : "Las Vegas"}</Badge>
+            {location.distributor_type && <Badge variant="outline">{location.distributor_type}</Badge>}
+          </div>
+          <h1 className="text-2xl font-semibold">{location.name}</h1>
+          {location.companies && (
+            <Link href={`/companies/${location.companies.id}`} className="text-sm text-primary hover:underline">
+              {location.companies.name}
+            </Link>
+          )}
+          {(location.address || location.city) && (
+            <p className="text-sm text-muted-foreground">
+              {location.address ? `${location.address}, ` : ""}
+              {location.city}
+              {location.city && location.state ? `, ${location.state}` : location.state}
+              {location.zip ? ` ${location.zip}` : ""}
+            </p>
+          )}
         </div>
-        <h1 className="text-2xl font-semibold">{location.name}</h1>
-        {location.companies && (
-          <Link href={`/companies/${location.companies.id}`} className="text-sm text-primary hover:underline">
-            {location.companies.name}
-          </Link>
-        )}
-        {(location.address || location.city) && (
-          <p className="text-sm text-muted-foreground">
-            {location.address ? `${location.address}, ` : ""}
-            {location.city}
-            {location.city && location.state ? `, ${location.state}` : location.state}
-            {location.zip ? ` ${location.zip}` : ""}
-          </p>
-        )}
+        <DeleteButton
+          action={deleteLocation}
+          args={[location.id, location.company_id]}
+          variant="outline"
+          size="sm"
+          label="Delete Location"
+          confirmMessage={`Delete "${location.name}"? This also deletes its ${contacts.length} contact(s), ${visitNotes.length} visit note(s), and ${opportunities.length} quote(s)/spec(s). This can't be undone.`}
+        />
       </div>
 
       <Tabs defaultValue="contacts">
@@ -93,9 +107,16 @@ export default async function LocationProfilePage({ params }: { params: Promise<
                     </p>
                     <p className="text-sm text-muted-foreground">{c.title}</p>
                   </div>
-                  <div className="text-sm text-muted-foreground">
-                    {c.phone && <p>{c.phone}</p>}
-                    {c.email && <p>{c.email}</p>}
+                  <div className="flex items-center gap-3">
+                    <div className="text-sm text-muted-foreground">
+                      {c.phone && <p>{c.phone}</p>}
+                      {c.email && <p>{c.email}</p>}
+                    </div>
+                    <DeleteButton
+                      action={deleteContact}
+                      args={[c.id, location.id]}
+                      confirmMessage={`Delete contact "${c.name}"?`}
+                    />
                   </div>
                 </CardContent>
               </Card>
@@ -114,8 +135,15 @@ export default async function LocationProfilePage({ params }: { params: Promise<
               <Card key={v.id}>
                 <CardContent className="space-y-1 py-4">
                   <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium">{v.visit_date}</p>
-                    {v.follow_up_date && <Badge variant="outline">Follow up {v.follow_up_date}</Badge>}
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium">{v.visit_date}</p>
+                      {v.follow_up_date && <Badge variant="outline">Follow up {v.follow_up_date}</Badge>}
+                    </div>
+                    <DeleteButton
+                      action={deleteVisitNote}
+                      args={[v.id, location.id]}
+                      confirmMessage={`Delete this visit note from ${v.visit_date}?`}
+                    />
                   </div>
                   <p className="text-sm text-muted-foreground">{v.notes}</p>
                 </CardContent>

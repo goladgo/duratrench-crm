@@ -64,3 +64,13 @@ export async function updateLocationStatus(locationId: string, status: LocationS
   revalidatePath(`/locations/${locationId}`);
   revalidatePath("/locations");
 }
+
+// Deleting a location cascades to its contacts, visit notes, and opportunities via FK.
+export async function deleteLocation(locationId: string, companyId: string | null) {
+  const supabase = await createClient();
+  const { error } = await supabase.from("locations").delete().eq("id", locationId);
+  if (error) return { error: error.message };
+  revalidatePath("/locations");
+  if (companyId) revalidatePath(`/companies/${companyId}`);
+  redirect("/locations");
+}

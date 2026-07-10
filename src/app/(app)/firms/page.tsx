@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { listCompanies } from "@/lib/queries/companies";
 import { CompanyFormDialog } from "@/components/company-form-dialog";
+import { SmartScanButton } from "@/components/smart-scan-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -47,6 +48,8 @@ export default async function FirmsPage({
           triggerLabel="Add Firm"
         />
       </div>
+
+      <SmartScanButton defaultCategory="civil_engineering" triggerLabel="Scan a Firm's Business Card" />
 
       <form action="/firms" className="flex gap-2">
         {type && <input type="hidden" name="type" value={type} />}

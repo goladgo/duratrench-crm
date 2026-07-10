@@ -59,3 +59,19 @@ export async function updateCompany(_prevState: FormState, formData: FormData): 
   revalidatePath("/firms");
   return { success: true };
 }
+
+// Deletes every location under this company first (cascading to their contacts,
+// visit notes, and opportunities via FK), then the company itself.
+export async function deleteCompany(id: string, category: CompanyCategory) {
+  const supabase = await createClient();
+
+  const { error: locationsError } = await supabase.from("locations").delete().eq("company_id", id);
+  if (locationsError) return { error: locationsError.message };
+
+  const { error } = await supabase.from("companies").delete().eq("id", id);
+  if (error) return { error: error.message };
+
+  revalidatePath("/companies");
+  revalidatePath("/firms");
+  redirect(category === "distributor" ? "/companies" : "/firms");
+}

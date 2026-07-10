@@ -42,3 +42,11 @@ export async function createContact(_prevState: FormState, formData: FormData): 
   revalidatePath(`/locations/${locationId}`);
   return { success: true };
 }
+
+export async function deleteContact(id: string, locationId: string): Promise<{ error?: string }> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("contacts").delete().eq("id", id);
+  if (error) return { error: error.message };
+  revalidatePath(`/locations/${locationId}`);
+  return {};
+}

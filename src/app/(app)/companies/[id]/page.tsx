@@ -4,6 +4,8 @@ import { getCompany } from "@/lib/queries/companies";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LocationFormDialog } from "@/components/location-form-dialog";
+import { DeleteButton } from "@/components/delete-button";
+import { deleteCompany } from "@/lib/actions/companies";
 import type { LocationStatus } from "@/lib/types";
 
 const CATEGORY_LABELS = {
@@ -37,15 +39,25 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
 
   return (
     <div className="space-y-6">
-      <div className="space-y-2">
-        <Badge variant="secondary">{CATEGORY_LABELS[company.category]}</Badge>
-        <h1 className="text-2xl font-semibold">{company.name}</h1>
-        {company.website && (
-          <a href={company.website} target="_blank" rel="noreferrer" className="text-sm text-primary hover:underline">
-            {company.website}
-          </a>
-        )}
-        {company.notes && <p className="text-sm text-muted-foreground">{company.notes}</p>}
+      <div className="flex items-start justify-between gap-2">
+        <div className="space-y-2">
+          <Badge variant="secondary">{CATEGORY_LABELS[company.category]}</Badge>
+          <h1 className="text-2xl font-semibold">{company.name}</h1>
+          {company.website && (
+            <a href={company.website} target="_blank" rel="noreferrer" className="text-sm text-primary hover:underline">
+              {company.website}
+            </a>
+          )}
+          {company.notes && <p className="text-sm text-muted-foreground">{company.notes}</p>}
+        </div>
+        <DeleteButton
+          action={deleteCompany}
+          args={[company.id, company.category]}
+          variant="outline"
+          size="sm"
+          label="Delete Company"
+          confirmMessage={`Delete "${company.name}"? This also deletes its ${locations.length} location(s) and everything under them (contacts, visit notes, quotes/specs). This can't be undone.`}
+        />
       </div>
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">

@@ -73,3 +73,11 @@ export async function logVisitAndReturn(formData: FormData) {
   revalidatePath(`/locations/${locationId}`);
   redirect("/visits/new?logged=1");
 }
+
+export async function deleteVisitNote(id: string, locationId: string): Promise<{ error?: string }> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("visit_notes").delete().eq("id", id);
+  if (error) return { error: error.message };
+  revalidatePath(`/locations/${locationId}`);
+  return {};
+}
