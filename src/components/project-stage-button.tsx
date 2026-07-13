@@ -3,20 +3,20 @@
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import type { ReactNode } from "react";
 
 export function ProjectStageButton({
   action,
   projectId,
   label,
-  icon: Icon,
+  icon,
   confirmMessage,
   variant = "outline",
 }: {
   action: (id: string) => Promise<{ error?: string } | void>;
   projectId: string;
   label: string;
-  icon: LucideIcon;
+  icon: ReactNode;
   confirmMessage?: string;
   variant?: "outline" | "ghost" | "destructive";
 }) {
@@ -35,7 +35,7 @@ export function ProjectStageButton({
   return (
     <div className="inline-flex flex-col items-start">
       <Button type="button" size="sm" variant={variant} onClick={handleClick} disabled={pending}>
-        {pending ? <Loader2 className="size-4 animate-spin" /> : <Icon className="size-4" />}
+        {pending ? <Loader2 className="size-4 animate-spin" /> : icon}
         {label}
       </Button>
       {error && <p className="text-xs text-destructive">{error}</p>}

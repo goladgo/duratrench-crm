@@ -81,12 +81,17 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
             action={markProjectLost}
             projectId={project.id}
             label="Mark Project as Lost"
-            icon={XCircle}
+            icon={<XCircle className="size-4" />}
             confirmMessage={`Mark "${project.name}" as lost? This means none of your branches' quotes won the job.`}
           />
         )}
         {project.stage !== "quoted" && (
-          <ProjectStageButton action={reopenProject} projectId={project.id} label="Reopen Project" icon={RotateCcw} />
+          <ProjectStageButton
+            action={reopenProject}
+            projectId={project.id}
+            label="Reopen Project"
+            icon={<RotateCcw className="size-4" />}
+          />
         )}
       </div>
 
