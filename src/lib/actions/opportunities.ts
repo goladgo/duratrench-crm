@@ -83,3 +83,13 @@ export async function updateOpportunityStage(id: string, locationId: string, sta
   if (error) throw new Error(error.message);
   revalidatePath(`/locations/${locationId}`);
 }
+
+export async function deleteOpportunity(id: string, locationId: string, companyId?: string | null): Promise<{ error?: string }> {
+  const supabase = await createClient();
+  const { error } = await supabase.from("opportunities").delete().eq("id", id);
+  if (error) return { error: error.message };
+  revalidatePath(`/locations/${locationId}`);
+  revalidatePath("/");
+  if (companyId) revalidatePath(`/companies/${companyId}`);
+  return {};
+}

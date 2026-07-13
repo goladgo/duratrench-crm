@@ -12,6 +12,7 @@ import { DeleteButton } from "@/components/delete-button";
 import { LunchLearnCard } from "@/components/lunch-learn-card";
 import { deleteContact } from "@/lib/actions/contacts";
 import { deleteVisitNote } from "@/lib/actions/visits";
+import { deleteOpportunity } from "@/lib/actions/opportunities";
 import { deleteLocation } from "@/lib/actions/locations";
 import type { LocationStatus, OpportunityStage } from "@/lib/types";
 
@@ -185,6 +186,11 @@ export default async function LocationProfilePage({ params }: { params: Promise<
                         contacts={contacts}
                         defaultKind={defaultOpportunityKind}
                         opportunity={o}
+                      />
+                      <DeleteButton
+                        action={deleteOpportunity}
+                        args={[o.id, location.id, location.company_id]}
+                        confirmMessage={`Delete "${o.title}"?`}
                       />
                     </div>
                   </div>
