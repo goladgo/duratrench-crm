@@ -36,8 +36,10 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
     notFound();
   }
 
-  const { company, rollup, locations } = data;
+  const { company, rollup, locations, locationStats } = data;
   if (!company) notFound();
+
+  const oppNoun = company.category === "distributor" ? "Quote" : "Spec";
 
   return (
     <div className="space-y-6">
@@ -101,32 +103,42 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
           <p className="text-sm text-muted-foreground">No locations under this company yet.</p>
         ) : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {locations.map((loc) => (
-              <Link key={loc.id} href={`/locations/${loc.id}`}>
-                <Card className="h-full transition-colors hover:bg-muted/50">
-                  <CardHeader className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <Badge variant={STATUS_VARIANT[loc.status]}>{loc.status}</Badge>
-                      <Badge variant="outline">{loc.territory_region === "socal" ? "SoCal" : "Las Vegas"}</Badge>
-                    </div>
-                    <CardTitle className="text-base">{loc.name}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-1 text-sm text-muted-foreground">
-                    {loc.city && (
-                      <p>
-                        {loc.city}, {loc.state}
-                      </p>
-                    )}
-                    {loc.lunch_learn_completed_at && (
-                      <p className="flex items-center gap-1.5 text-foreground">
-                        <Utensils className="size-3.5 shrink-0 text-primary" />
-                        Lunch &amp; Learn completed {loc.lunch_learn_completed_at}
-                      </p>
-                    )}
-                  </CardContent>
-                </Card>
-              </Link>
-            ))}
+            {locations.map((loc) => {
+              const stats = locationStats.get(loc.id);
+              return (
+                <Link key={loc.id} href={`/locations/${loc.id}`}>
+                  <Card className="h-full transition-colors hover:bg-muted/50">
+                    <CardHeader className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <Badge variant={STATUS_VARIANT[loc.status]}>{loc.status}</Badge>
+                        <Badge variant="outline">{loc.territory_region === "socal" ? "SoCal" : "Las Vegas"}</Badge>
+                      </div>
+                      <CardTitle className="text-base">{loc.name}</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-1 text-sm text-muted-foreground">
+                      {loc.city && (
+                        <p>
+                          {loc.city}, {loc.state}
+                        </p>
+                      )}
+                      {loc.lunch_learn_completed_at && (
+                        <p className="flex items-center gap-1.5 text-foreground">
+                          <Utensils className="size-3.5 shrink-0 text-primary" />
+                          Lunch &amp; Learn completed {loc.lunch_learn_completed_at}
+                        </p>
+                      )}
+                      {stats?.lastVisitDate && <p>Last visit {stats.lastVisitDate}</p>}
+                      {stats && stats.opportunityCount > 0 && (
+                        <p>
+                          {stats.opportunityCount} {oppNoun}
+                          {stats.opportunityCount === 1 ? "" : "s"} · {formatMoney(stats.opportunityTotal)}
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                </Link>
+              );
+            })}
           </div>
         )}
       </div>

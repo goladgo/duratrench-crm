@@ -5,7 +5,7 @@ import { signOut } from "@/app/login/actions";
 
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/companies", label: "Companies", icon: Building2 },
+  { href: "/companies", label: "Distributors", icon: Building2 },
   { href: "/firms", label: "Design Firms", icon: Users },
   { href: "/contractors", label: "Contractors", icon: HardHat },
 ];

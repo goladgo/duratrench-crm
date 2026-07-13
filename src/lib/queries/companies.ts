@@ -68,6 +68,41 @@ export async function listCompanies(categories: CompanyCategory[], search?: stri
   }));
 }
 
+// Per-branch overview stats shown on the parent company profile page — last visit
+// and a quick quote/spec count + dollar total, so a rep can see at a glance which
+// office needs attention without opening each one.
+export interface LocationStats {
+  lastVisitDate: string | null;
+  opportunityCount: number;
+  opportunityTotal: number;
+}
+
+function summarizeLocationStats(
+  locationIds: string[],
+  visits: { location_id: string; visit_date: string }[],
+  opportunities: { location_id: string; amount: number | null }[]
+): Map<string, LocationStats> {
+  const map = new Map<string, LocationStats>();
+  for (const id of locationIds) {
+    map.set(id, { lastVisitDate: null, opportunityCount: 0, opportunityTotal: 0 });
+  }
+
+  for (const v of visits) {
+    const stats = map.get(v.location_id);
+    if (!stats) continue;
+    if (!stats.lastVisitDate || v.visit_date > stats.lastVisitDate) stats.lastVisitDate = v.visit_date;
+  }
+
+  for (const o of opportunities) {
+    const stats = map.get(o.location_id);
+    if (!stats) continue;
+    stats.opportunityCount += 1;
+    stats.opportunityTotal += o.amount ?? 0;
+  }
+
+  return map;
+}
+
 export async function getCompany(id: string) {
   const supabase = await createClient();
 
@@ -82,10 +117,28 @@ export async function getCompany(id: string) {
   if (rollupError) throw new Error(rollupError.message);
   if (locationsError) throw new Error(locationsError.message);
 
+  const locationIds = (locations ?? []).map((l) => l.id);
+  let locationStats = new Map<string, LocationStats>();
+  if (locationIds.length > 0) {
+    const [{ data: visitRows, error: visitsError }, { data: oppRows, error: oppsError }] = await Promise.all([
+      supabase.from("visit_notes").select("location_id, visit_date").in("location_id", locationIds),
+      supabase.from("opportunities").select("location_id, amount").in("location_id", locationIds),
+    ]);
+    if (visitsError) throw new Error(visitsError.message);
+    if (oppsError) throw new Error(oppsError.message);
+
+    locationStats = summarizeLocationStats(
+      locationIds,
+      (visitRows ?? []) as { location_id: string; visit_date: string }[],
+      (oppRows ?? []) as { location_id: string; amount: number | null }[]
+    );
+  }
+
   return {
     company: company as Company,
     rollup: rollup as CompanyRollup | null,
     locations: (locations ?? []) as Location[],
+    locationStats,
   };
 }
 

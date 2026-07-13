@@ -19,7 +19,7 @@ import {
 import type { PlannedVisitWithLocation } from "@/lib/types";
 
 const SHORTCUTS = [
-  { href: "/companies", label: "Companies", icon: Building2 },
+  { href: "/companies", label: "Distributors", icon: Building2 },
   { href: "/firms", label: "Design Firms", icon: Users },
   { href: "/contractors", label: "Contractors", icon: HardHat },
 ];

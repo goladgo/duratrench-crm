@@ -22,10 +22,10 @@ export default async function CompaniesPage({
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold">Companies</h1>
+          <h1 className="text-2xl font-semibold">Distributors</h1>
           <p className="text-muted-foreground">Distributor chains across your territory</p>
         </div>
-        <CompanyFormDialog categories={["distributor"]} triggerLabel="Add Company" />
+        <CompanyFormDialog categories={["distributor"]} triggerLabel="Add Distributor" />
       </div>
 
       <form action="/companies" className="flex gap-2">
