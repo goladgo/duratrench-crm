@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getLocationProfile } from "@/lib/queries/locations";
+import { listProjectsForPicker } from "@/lib/queries/projects";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { User } from "lucide-react";
@@ -47,6 +48,8 @@ export default async function LocationProfilePage({ params }: { params: Promise<
 
   const { location, contacts, visitNotes, opportunities } = profile;
   if (!location) notFound();
+
+  const projects = await listProjectsForPicker();
 
   const contactsById = new Map(contacts.map((c) => [c.id, c]));
   const defaultOpportunityKind = location.companies?.category && location.companies.category !== "distributor" ? "spec" : "quote";
@@ -171,7 +174,12 @@ export default async function LocationProfilePage({ params }: { params: Promise<
 
         <TabsContent value="opportunities" className="space-y-3 pt-4">
           <div className="flex justify-end">
-            <OpportunityFormDialog locationId={location.id} contacts={contacts} defaultKind={defaultOpportunityKind} />
+            <OpportunityFormDialog
+              locationId={location.id}
+              contacts={contacts}
+              defaultKind={defaultOpportunityKind}
+              projects={projects}
+            />
           </div>
           {opportunities.length === 0 ? (
             <p className="text-sm text-muted-foreground">Nothing logged yet.</p>
@@ -190,6 +198,7 @@ export default async function LocationProfilePage({ params }: { params: Promise<
                           contacts={contacts}
                           defaultKind={defaultOpportunityKind}
                           opportunity={o}
+                          projects={projects}
                         />
                         <DeleteButton
                           action={deleteOpportunity}
@@ -207,6 +216,11 @@ export default async function LocationProfilePage({ params }: { params: Promise<
                         <User className="size-3.5 shrink-0" />
                         {contact.name}
                       </p>
+                    )}
+                    {o.project_id && (
+                      <Link href={`/projects/${o.project_id}`} className="text-sm text-primary hover:underline">
+                        View project
+                      </Link>
                     )}
                     {o.notes && <p className="text-sm text-muted-foreground">{o.notes}</p>}
                   </CardContent>

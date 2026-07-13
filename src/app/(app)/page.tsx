@@ -1,11 +1,14 @@
 import Link from "next/link";
 import { Building2, ChevronLeft, ChevronRight, HardHat, PlusCircle, Users, Utensils } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { AddStopDialog } from "@/components/add-stop-dialog";
 import { PlannerStopCard } from "@/components/planner-stop-card";
+import { ProjectFormDialog } from "@/components/project-form-dialog";
 import { listLocations } from "@/lib/queries/locations";
 import { listPlannedVisits, listUpcomingLunchLearns } from "@/lib/queries/planner";
+import { listProjectsForDashboard } from "@/lib/queries/projects";
 import {
   addDays,
   formatISODate,
@@ -16,7 +19,13 @@ import {
   WEEKDAY_LABELS,
   weekDates,
 } from "@/lib/date-utils";
-import type { PlannedVisitWithLocation } from "@/lib/types";
+import type { PlannedVisitWithLocation, ProjectStage } from "@/lib/types";
+
+const PROJECT_STAGE_VARIANT: Record<ProjectStage, "default" | "secondary" | "destructive"> = {
+  quoted: "secondary",
+  won: "default",
+  lost: "destructive",
+};
 
 const SHORTCUTS = [
   { href: "/companies", label: "Distributors", icon: Building2 },
@@ -38,10 +47,11 @@ export default async function DashboardPage({
   const weekEnd = days[days.length - 1];
   const isCurrentWeek = weekStart === defaultWeekStart;
 
-  const [locations, plannedVisits, upcomingLunchLearns] = await Promise.all([
+  const [locations, plannedVisits, upcomingLunchLearns, projects] = await Promise.all([
     listLocations(),
     listPlannedVisits(weekStart, weekEnd),
     listUpcomingLunchLearns(6),
+    listProjectsForDashboard(),
   ]);
 
   const stopsByDate = new Map<string, PlannedVisitWithLocation[]>();
@@ -137,6 +147,39 @@ export default async function DashboardPage({
                     </div>
                   </CardContent>
                 </Card>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-medium">Projects</h2>
+          <ProjectFormDialog />
+        </div>
+        {projects.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No projects yet — log a quote from a branch and tag it to a project, or start one here.
+          </p>
+        ) : (
+          <div className="max-h-[560px] divide-y overflow-y-auto rounded-lg border">
+            {projects.map((p) => (
+              <Link
+                key={p.id}
+                href={`/projects/${p.id}`}
+                className="flex items-center justify-between gap-3 px-3 py-3 text-sm transition-colors hover:bg-muted/50"
+              >
+                <div className="min-w-0">
+                  <p className="truncate font-medium">{p.name}</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {p.specifying_company?.name ? `Spec'd by ${p.specifying_company.name} · ` : ""}
+                    {p.quote_count} quote{p.quote_count === 1 ? "" : "s"}
+                  </p>
+                </div>
+                <Badge variant={PROJECT_STAGE_VARIANT[p.stage]} className="shrink-0">
+                  {p.stage}
+                </Badge>
               </Link>
             ))}
           </div>

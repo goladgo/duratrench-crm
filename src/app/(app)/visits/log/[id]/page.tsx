@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getLocationProfile } from "@/lib/queries/locations";
+import { listProjectsForPicker } from "@/lib/queries/projects";
 import { logVisitAndReturn } from "@/lib/actions/visits";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
@@ -25,6 +26,7 @@ export default async function LogVisitPage({ params }: { params: Promise<{ id: s
   const { location, contacts } = profile;
   if (!location) notFound();
 
+  const projects = await listProjectsForPicker();
   const defaultOpportunityKind = location.companies?.category && location.companies.category !== "distributor" ? "spec" : "quote";
 
   return (
@@ -98,7 +100,12 @@ export default async function LogVisitPage({ params }: { params: Promise<{ id: s
       <div className="flex flex-wrap items-center justify-center gap-3 border-t pt-4">
         <ScanCardButton locationId={location.id} />
         <ContactFormDialog locationId={location.id} />
-        <OpportunityFormDialog locationId={location.id} contacts={contacts} defaultKind={defaultOpportunityKind} />
+        <OpportunityFormDialog
+          locationId={location.id}
+          contacts={contacts}
+          defaultKind={defaultOpportunityKind}
+          projects={projects}
+        />
       </div>
     </div>
   );

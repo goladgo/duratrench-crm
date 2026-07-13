@@ -1,13 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCompany } from "@/lib/queries/companies";
+import { listProjectsBySpecifyingCompany } from "@/lib/queries/projects";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LocationFormDialog } from "@/components/location-form-dialog";
 import { DeleteButton } from "@/components/delete-button";
 import { deleteCompany } from "@/lib/actions/companies";
 import { Utensils } from "lucide-react";
-import type { LocationStatus } from "@/lib/types";
+import type { LocationStatus, ProjectStage } from "@/lib/types";
 
 const CATEGORY_LABELS = {
   distributor: "Distributor",
@@ -21,6 +22,14 @@ const STATUS_VARIANT: Record<LocationStatus, "default" | "secondary" | "outline"
   prospect: "secondary",
   inactive: "outline",
 };
+
+const PROJECT_STAGE_VARIANT: Record<ProjectStage, "default" | "secondary" | "destructive"> = {
+  quoted: "secondary",
+  won: "default",
+  lost: "destructive",
+};
+
+const DESIGN_FIRM_CATEGORIES = ["civil_engineering", "landscape_architecture"];
 
 function formatMoney(value: number) {
   return value.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
@@ -40,6 +49,8 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
   if (!company) notFound();
 
   const oppNoun = company.category === "distributor" ? "Quote" : "Spec";
+  const isDesignFirm = DESIGN_FIRM_CATEGORIES.includes(company.category);
+  const specifiedProjects = isDesignFirm ? await listProjectsBySpecifyingCompany(company.id) : [];
 
   return (
     <div className="space-y-6">
@@ -142,6 +153,30 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
           </div>
         )}
       </div>
+
+      {isDesignFirm && (
+        <div className="space-y-3">
+          <h2 className="text-lg font-medium">Projects Specified</h2>
+          {specifiedProjects.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No projects tracked yet — set this firm as the specifying firm on a project's page.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {specifiedProjects.map((p) => (
+                <Link key={p.id} href={`/projects/${p.id}`}>
+                  <Card className="h-full transition-colors hover:bg-muted/50">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                      <CardTitle className="text-base">{p.name}</CardTitle>
+                      <Badge variant={PROJECT_STAGE_VARIANT[p.stage]}>{p.stage}</Badge>
+                    </CardHeader>
+                  </Card>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

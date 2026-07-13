@@ -16,7 +16,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { createOpportunity, updateOpportunity, type FormState } from "@/lib/actions/opportunities";
 import { PlusCircle, Pencil } from "lucide-react";
-import type { Contact, Opportunity, OpportunityKind } from "@/lib/types";
+import type { Contact, Opportunity, OpportunityKind, Project } from "@/lib/types";
 
 const initialState: FormState = {};
 
@@ -25,11 +25,13 @@ export function OpportunityFormDialog({
   contacts,
   defaultKind,
   opportunity,
+  projects = [],
 }: {
   locationId: string;
   contacts: Contact[];
   defaultKind: OpportunityKind;
   opportunity?: Opportunity;
+  projects?: Pick<Project, "id" | "name">[];
 }) {
   const isEdit = !!opportunity;
   const [open, setOpen] = useState(false);
@@ -104,6 +106,24 @@ export function OpportunityFormDialog({
               </SelectContent>
             </Select>
           </div>
+          {kind === "quote" && (
+            <div className="space-y-2">
+              <Label htmlFor="opp-project">Project</Label>
+              <Select name="project_id" defaultValue={opportunity?.project_id ?? undefined}>
+                <SelectTrigger id="opp-project" className="w-full">
+                  <SelectValue placeholder="No project" />
+                </SelectTrigger>
+                <SelectContent>
+                  {projects.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input name="new_project_name" placeholder="...or type a new project name to create one" />
+            </div>
+          )}
           {contacts.length > 0 && (
             <div className="space-y-2">
               <Label htmlFor="opp-contact">Contact</Label>

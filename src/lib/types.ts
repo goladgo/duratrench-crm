@@ -5,6 +5,7 @@ export type LocationStatus = "prospect" | "active" | "inactive";
 export type OpportunityKind = "quote" | "spec";
 export type OpportunityStage = "quoted" | "negotiating" | "won" | "lost";
 export type PlannedVisitStatus = "planned" | "completed" | "skipped";
+export type ProjectStage = "quoted" | "won" | "lost";
 
 export interface Company {
   id: string;
@@ -65,6 +66,7 @@ export interface Opportunity {
   rep_id: string;
   location_id: string;
   contact_id: string | null;
+  project_id: string | null;
   kind: OpportunityKind;
   title: string;
   product_line: string | null;
@@ -74,6 +76,36 @@ export interface Opportunity {
   close_date: string | null;
   notes: string | null;
   created_at: string;
+}
+
+export interface Project {
+  id: string;
+  rep_id: string;
+  name: string;
+  notes: string | null;
+  stage: ProjectStage;
+  specifying_company_id: string | null;
+  winning_opportunity_id: string | null;
+  created_at: string;
+}
+
+export interface ProjectListItem extends Project {
+  specifying_company: Pick<Company, "id" | "name"> | null;
+  quote_count: number;
+}
+
+export interface ProjectQuote extends Opportunity {
+  contacts: Pick<Contact, "id" | "name"> | null;
+  locations:
+    | (Pick<Location, "id" | "name" | "city"> & {
+        companies: Pick<Company, "id" | "name"> | null;
+      })
+    | null;
+}
+
+export interface ProjectDetail extends Project {
+  specifying_company: Pick<Company, "id" | "name" | "category"> | null;
+  quotes: ProjectQuote[];
 }
 
 export interface PlannedVisit {
