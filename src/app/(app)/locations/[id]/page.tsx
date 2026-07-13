@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getLocationProfile } from "@/lib/queries/locations";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { User } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ContactFormDialog } from "@/components/contact-form-dialog";
 import { ScanCardButton } from "@/components/scan-card-button";
@@ -47,6 +48,7 @@ export default async function LocationProfilePage({ params }: { params: Promise<
   const { location, contacts, visitNotes, opportunities } = profile;
   if (!location) notFound();
 
+  const contactsById = new Map(contacts.map((c) => [c.id, c]));
   const defaultOpportunityKind = location.companies?.category && location.companies.category !== "distributor" ? "spec" : "quote";
   const isDesignFirm = !!location.companies?.category && location.companies.category !== "distributor";
 
@@ -174,34 +176,43 @@ export default async function LocationProfilePage({ params }: { params: Promise<
           {opportunities.length === 0 ? (
             <p className="text-sm text-muted-foreground">Nothing logged yet.</p>
           ) : (
-            opportunities.map((o) => (
-              <Card key={o.id}>
-                <CardContent className="space-y-1 py-4">
-                  <div className="flex items-center justify-between">
-                    <p className="font-medium">{o.title}</p>
-                    <div className="flex items-center gap-2">
-                      <Badge variant={STAGE_VARIANT[o.stage]}>{o.stage}</Badge>
-                      <OpportunityFormDialog
-                        locationId={location.id}
-                        contacts={contacts}
-                        defaultKind={defaultOpportunityKind}
-                        opportunity={o}
-                      />
-                      <DeleteButton
-                        action={deleteOpportunity}
-                        args={[o.id, location.id, location.company_id]}
-                        confirmMessage={`Delete "${o.title}"?`}
-                      />
+            opportunities.map((o) => {
+              const contact = o.contact_id ? contactsById.get(o.contact_id) : undefined;
+              return (
+                <Card key={o.id}>
+                  <CardContent className="space-y-1 py-4">
+                    <div className="flex items-center justify-between">
+                      <p className="font-medium">{o.title}</p>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={STAGE_VARIANT[o.stage]}>{o.stage}</Badge>
+                        <OpportunityFormDialog
+                          locationId={location.id}
+                          contacts={contacts}
+                          defaultKind={defaultOpportunityKind}
+                          opportunity={o}
+                        />
+                        <DeleteButton
+                          action={deleteOpportunity}
+                          args={[o.id, location.id, location.company_id]}
+                          confirmMessage={`Delete "${o.title}"?`}
+                        />
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex justify-between text-sm text-muted-foreground">
-                    <span>{o.product_line}</span>
-                    <span>{formatMoney(o.amount)}</span>
-                  </div>
-                  {o.notes && <p className="text-sm text-muted-foreground">{o.notes}</p>}
-                </CardContent>
-              </Card>
-            ))
+                    <div className="flex justify-between text-sm text-muted-foreground">
+                      <span>{o.product_line}</span>
+                      <span>{formatMoney(o.amount)}</span>
+                    </div>
+                    {contact && (
+                      <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                        <User className="size-3.5 shrink-0" />
+                        {contact.name}
+                      </p>
+                    )}
+                    {o.notes && <p className="text-sm text-muted-foreground">{o.notes}</p>}
+                  </CardContent>
+                </Card>
+              );
+            })
           )}
         </TabsContent>
       </Tabs>
