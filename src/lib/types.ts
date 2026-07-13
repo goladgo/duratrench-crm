@@ -4,6 +4,7 @@ export type TerritoryRegion = "socal" | "vegas";
 export type LocationStatus = "prospect" | "active" | "inactive";
 export type OpportunityKind = "quote" | "spec";
 export type OpportunityStage = "quoted" | "negotiating" | "won" | "lost";
+export type PlannedVisitStatus = "planned" | "completed" | "skipped";
 
 export interface Company {
   id: string;
@@ -73,6 +74,24 @@ export interface Opportunity {
   close_date: string | null;
   notes: string | null;
   created_at: string;
+}
+
+export interface PlannedVisit {
+  id: string;
+  rep_id: string;
+  location_id: string;
+  planned_date: string;
+  status: PlannedVisitStatus;
+  notes: string | null;
+  created_at: string;
+}
+
+export interface PlannedVisitWithLocation extends PlannedVisit {
+  locations:
+    | (Pick<Location, "id" | "name" | "city" | "state" | "territory_region"> & {
+        companies: Pick<Company, "id" | "name" | "category"> | null;
+      })
+    | null;
 }
 
 export interface CompanyRollup {

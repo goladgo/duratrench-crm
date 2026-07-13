@@ -5,16 +5,15 @@ import { SmartScanButton } from "@/components/smart-scan-button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Search } from "lucide-react";
+import { Search, Utensils } from "lucide-react";
 import type { CompanyCategory } from "@/lib/types";
 
 const CATEGORY_LABELS = {
   civil_engineering: "Civil Engineering",
   landscape_architecture: "Landscape Architecture",
-  contractor: "Contractor",
 } as const;
 
-const FIRM_CATEGORIES: CompanyCategory[] = ["civil_engineering", "landscape_architecture", "contractor"];
+const FIRM_CATEGORIES: CompanyCategory[] = ["civil_engineering", "landscape_architecture"];
 
 export default async function FirmsPage({
   searchParams,
@@ -41,7 +40,7 @@ export default async function FirmsPage({
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Design Firms</h1>
-          <p className="text-muted-foreground">Civil engineers, landscape architects &amp; contractors</p>
+          <p className="text-muted-foreground">Civil engineers &amp; landscape architects</p>
         </div>
         <CompanyFormDialog categories={FIRM_CATEGORIES} triggerLabel="Add Firm" />
       </div>
@@ -66,16 +65,13 @@ export default async function FirmsPage({
         <Link href={filterLink({ type: "landscape_architecture" })}>
           <Badge variant={type === "landscape_architecture" ? "default" : "outline"}>Landscape Architecture</Badge>
         </Link>
-        <Link href={filterLink({ type: "contractor" })}>
-          <Badge variant={type === "contractor" ? "default" : "outline"}>Contractor</Badge>
-        </Link>
       </div>
 
       {rows.length === 0 ? (
-        <p className="text-muted-foreground">No firms yet. Add a civil engineering, landscape architecture, or contractor firm.</p>
+        <p className="text-muted-foreground">No firms yet. Add a civil engineering or landscape architecture firm.</p>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {rows.map(({ company, rollup }) => (
+          {rows.map(({ company, rollup, lunchLearn }) => (
             <Link key={company.id} href={`/companies/${company.id}`}>
               <Card className="h-full transition-colors hover:bg-muted/50">
                 <CardHeader className="space-y-1.5">
@@ -94,6 +90,15 @@ export default async function FirmsPage({
                     <span>{rollup?.contact_count ?? 0}</span>
                   </div>
                   {rollup?.last_visit_date && <p>Last visit {rollup.last_visit_date}</p>}
+                  {lunchLearn.status === "completed" && (
+                    <p className="flex items-center gap-1.5 text-foreground">
+                      <Utensils className="size-3.5 shrink-0 text-primary" />
+                      Lunch &amp; Learn completed {lunchLearn.date}
+                      {lunchLearn.branchCity || lunchLearn.branchName
+                        ? ` — ${lunchLearn.branchCity ?? lunchLearn.branchName}`
+                        : ""}
+                    </p>
+                  )}
                 </CardContent>
               </Card>
             </Link>

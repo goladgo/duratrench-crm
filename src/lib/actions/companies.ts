@@ -36,6 +36,7 @@ export async function createCompany(_prevState: FormState, formData: FormData): 
 
   revalidatePath("/companies");
   revalidatePath("/firms");
+  revalidatePath("/contractors");
   if (redirectTo) redirect(redirectTo);
   return { success: true };
 }
@@ -57,6 +58,7 @@ export async function updateCompany(_prevState: FormState, formData: FormData): 
   revalidatePath(`/companies/${id}`);
   revalidatePath("/companies");
   revalidatePath("/firms");
+  revalidatePath("/contractors");
   return { success: true };
 }
 
@@ -73,5 +75,8 @@ export async function deleteCompany(id: string, category: CompanyCategory) {
 
   revalidatePath("/companies");
   revalidatePath("/firms");
-  redirect(category === "distributor" ? "/companies" : "/firms");
+  revalidatePath("/contractors");
+  const destination =
+    category === "distributor" ? "/companies" : category === "contractor" ? "/contractors" : "/firms";
+  redirect(destination);
 }

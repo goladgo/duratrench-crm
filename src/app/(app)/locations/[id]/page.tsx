@@ -122,6 +122,7 @@ export default async function LocationProfilePage({ params }: { params: Promise<
                       {c.phone && <p>{c.phone}</p>}
                       {c.email && <p>{c.email}</p>}
                     </div>
+                    <ContactFormDialog locationId={location.id} contact={c} />
                     <DeleteButton
                       action={deleteContact}
                       args={[c.id, location.id]}
@@ -149,11 +150,14 @@ export default async function LocationProfilePage({ params }: { params: Promise<
                       <p className="text-sm font-medium">{v.visit_date}</p>
                       {v.follow_up_date && <Badge variant="outline">Follow up {v.follow_up_date}</Badge>}
                     </div>
-                    <DeleteButton
-                      action={deleteVisitNote}
-                      args={[v.id, location.id]}
-                      confirmMessage={`Delete this visit note from ${v.visit_date}?`}
-                    />
+                    <div className="flex items-center gap-1">
+                      <VisitNoteFormDialog locationId={location.id} contacts={contacts} visitNote={v} />
+                      <DeleteButton
+                        action={deleteVisitNote}
+                        args={[v.id, location.id]}
+                        confirmMessage={`Delete this visit note from ${v.visit_date}?`}
+                      />
+                    </div>
                   </div>
                   <p className="text-sm text-muted-foreground">{v.notes}</p>
                 </CardContent>
@@ -174,7 +178,15 @@ export default async function LocationProfilePage({ params }: { params: Promise<
                 <CardContent className="space-y-1 py-4">
                   <div className="flex items-center justify-between">
                     <p className="font-medium">{o.title}</p>
-                    <Badge variant={STAGE_VARIANT[o.stage]}>{o.stage}</Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge variant={STAGE_VARIANT[o.stage]}>{o.stage}</Badge>
+                      <OpportunityFormDialog
+                        locationId={location.id}
+                        contacts={contacts}
+                        defaultKind={defaultOpportunityKind}
+                        opportunity={o}
+                      />
+                    </div>
                   </div>
                   <div className="flex justify-between text-sm text-muted-foreground">
                     <span>{o.product_line}</span>

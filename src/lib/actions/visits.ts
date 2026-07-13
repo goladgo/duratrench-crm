@@ -42,6 +42,31 @@ export async function createVisitNote(_prevState: FormState, formData: FormData)
   return { success: true };
 }
 
+export async function updateVisitNote(_prevState: FormState, formData: FormData): Promise<FormState> {
+  const id = String(formData.get("id") ?? "");
+  const locationId = String(formData.get("location_id") ?? "");
+  const contactId = String(formData.get("contact_id") ?? "").trim() || null;
+  const visitDate = String(formData.get("visit_date") ?? "").trim();
+  const notes = String(formData.get("notes") ?? "").trim();
+  const followUpDate = String(formData.get("follow_up_date") ?? "").trim() || null;
+
+  if (!id) return { error: "Missing visit note." };
+  if (!locationId) return { error: "Missing location." };
+  if (!visitDate) return { error: "Visit date is required." };
+  if (!notes) return { error: "Add a note about the visit." };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("visit_notes")
+    .update({ contact_id: contactId, visit_date: visitDate, notes, follow_up_date: followUpDate })
+    .eq("id", id);
+
+  if (error) return { error: error.message };
+
+  revalidatePath(`/locations/${locationId}`);
+  return { success: true };
+}
+
 // Used by the full-page mobile "Log a Visit" flow, which posts directly to a
 // server action (no client JS needed) and always redirects to the next stop.
 export async function logVisitAndReturn(formData: FormData) {

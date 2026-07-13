@@ -50,7 +50,7 @@ export async function createLocation(_prevState: FormState, formData: FormData):
 
   if (error) return { error: error.message };
 
-  revalidatePath("/locations");
+  revalidatePath("/");
   if (companyId) revalidatePath(`/companies/${companyId}`);
 
   if (redirectTo) redirect(redirectTo.replace(":id", data.id));
@@ -62,7 +62,7 @@ export async function updateLocationStatus(locationId: string, status: LocationS
   const { error } = await supabase.from("locations").update({ status }).eq("id", locationId);
   if (error) throw new Error(error.message);
   revalidatePath(`/locations/${locationId}`);
-  revalidatePath("/locations");
+  revalidatePath("/");
 }
 
 // Deleting a location cascades to its contacts, visit notes, and opportunities via FK.
@@ -70,9 +70,9 @@ export async function deleteLocation(locationId: string, companyId: string | nul
   const supabase = await createClient();
   const { error } = await supabase.from("locations").delete().eq("id", locationId);
   if (error) return { error: error.message };
-  revalidatePath("/locations");
+  revalidatePath("/");
   if (companyId) revalidatePath(`/companies/${companyId}`);
-  redirect("/locations");
+  redirect(companyId ? `/companies/${companyId}` : "/");
 }
 
 export async function updateLunchLearn(

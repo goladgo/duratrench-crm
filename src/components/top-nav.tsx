@@ -1,12 +1,13 @@
 import Link from "next/link";
-import { Building2, MapPin, PlusCircle, Users } from "lucide-react";
+import { Building2, HardHat, LayoutDashboard, PlusCircle, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { signOut } from "@/app/login/actions";
 
 const NAV_ITEMS = [
-  { href: "/locations", label: "Locations", icon: MapPin },
+  { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/companies", label: "Companies", icon: Building2 },
   { href: "/firms", label: "Design Firms", icon: Users },
+  { href: "/contractors", label: "Contractors", icon: HardHat },
 ];
 
 export function TopNav({ email }: { email: string | null }) {
@@ -15,7 +16,7 @@ export function TopNav({ email }: { email: string | null }) {
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
         <div className="flex items-center gap-8">
           <Link href="/" className="font-semibold">
-            Territory CRM
+            DuraTrench
           </Link>
           <nav className="flex items-center gap-6 text-sm">
             {NAV_ITEMS.map(({ href, label, icon: Icon }) => (

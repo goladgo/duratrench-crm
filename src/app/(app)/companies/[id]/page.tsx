@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LocationFormDialog } from "@/components/location-form-dialog";
 import { DeleteButton } from "@/components/delete-button";
 import { deleteCompany } from "@/lib/actions/companies";
+import { Utensils } from "lucide-react";
 import type { LocationStatus } from "@/lib/types";
 
 const CATEGORY_LABELS = {
@@ -110,10 +111,16 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
                     </div>
                     <CardTitle className="text-base">{loc.name}</CardTitle>
                   </CardHeader>
-                  <CardContent className="text-sm text-muted-foreground">
+                  <CardContent className="space-y-1 text-sm text-muted-foreground">
                     {loc.city && (
                       <p>
                         {loc.city}, {loc.state}
+                      </p>
+                    )}
+                    {loc.lunch_learn_completed_at && (
+                      <p className="flex items-center gap-1.5 text-foreground">
+                        <Utensils className="size-3.5 shrink-0 text-primary" />
+                        Lunch &amp; Learn completed {loc.lunch_learn_completed_at}
                       </p>
                     )}
                   </CardContent>
