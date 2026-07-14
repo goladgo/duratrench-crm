@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { Trophy } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -10,7 +9,6 @@ import {
   getDistributorPerformance,
   getDistributorRepPerformance,
   listProjectsForDashboard,
-  listWonProjects,
 } from "@/lib/queries/projects";
 import type { ProjectListItem, ProjectStage } from "@/lib/types";
 
@@ -53,14 +51,12 @@ function ProjectRow({ project }: { project: ProjectListItem }) {
 }
 
 export default async function ProjectsPage() {
-  const [projects, wonProjects, distributorPerformance, distributorRepPerformance, contractorPerformance] =
-    await Promise.all([
-      listProjectsForDashboard(200),
-      listWonProjects(),
-      getDistributorPerformance(),
-      getDistributorRepPerformance(),
-      getContractorPerformance(),
-    ]);
+  const [projects, distributorPerformance, distributorRepPerformance, contractorPerformance] = await Promise.all([
+    listProjectsForDashboard(200),
+    getDistributorPerformance(),
+    getDistributorRepPerformance(),
+    getContractorPerformance(),
+  ]);
 
   return (
     <div className="space-y-8">
@@ -100,33 +96,6 @@ export default async function ProjectsPage() {
           );
         })}
       </Tabs>
-
-      <div className="space-y-3">
-        <h2 className="text-lg font-medium">Won Projects</h2>
-        {wonProjects.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No projects won yet.</p>
-        ) : (
-          <div className="space-y-3">
-            {wonProjects.map((p) => (
-              <Card key={p.id}>
-                <CardContent className="flex items-center gap-3 py-4">
-                  <Trophy className="size-5 shrink-0 text-primary" />
-                  <div className="min-w-0 flex-1">
-                    <Link href={`/projects/${p.id}`} className="font-medium hover:underline">
-                      {p.name}
-                    </Link>
-                    <p className="text-sm text-muted-foreground">
-                      Won by {p.winner_company_name ?? p.winner_location_name ?? "—"}
-                      {p.winner_company_name && p.winner_location_name ? ` — ${p.winner_location_name}` : ""}
-                    </p>
-                  </div>
-                  <span className="shrink-0 text-sm font-medium">{formatMoney(p.amount)}</span>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
 
       <div className="space-y-3">
         <h2 className="text-lg font-medium">Distributor Performance</h2>
