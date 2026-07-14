@@ -31,6 +31,16 @@ Reps:
 
 **Environment note — don't trust `npx tsc`/`next build` run via the sandbox bash tool on this repo.** The bash tool's mount of this Windows folder truncates/corrupts reads of pre-existing CRLF-terminated files (confirmed: a file read cleanly via the `Read` tool cut off mid-string at the exact same byte every time when read through `bash`/`awk`/`cat`, and freshly-`Write`-tool-created LF-only files in the same folder read back fine). A `tsc --noEmit` run this session flagged ~100 "errors" across files never touched this session — all spurious, an artifact of the mount, not real bugs. Verify future non-trivial changes by re-reading edited files with the `Read` tool and reviewing for balanced braces/tags/types by hand, not by trusting a bash-run compiler on this particular workspace mount.
 
+## Status as of 2026-07-14 (session 3): Contractor wins, distributor status cleanup, contact counts
+
+**Done (migration 0009 written, NOT yet run by user — hand off `supabase/migrations/0009_distributor_status_cleanup.sql`):**
+- Fixed contractor quotes incorrectly defaulting to `kind: 'spec'` (same bug as design firms) in `locations/[id]/page.tsx` and `visits/log/[id]/page.tsx` — contractors now default to `kind: 'quote'` so their opportunities are project-linkable. This was a prerequisite for the next item.
+- New "Projects Won by Contractors" section on `/projects`, below Distributor Rep Performance — filters `listWonProjects()` results by `winner_company_category === "contractor"`. Required adding `category` to the company join in `listWonProjects()` and a new `winner_company_category` field on `WonProjectSummary`.
+- Distributor location status simplified to Active/Inactive only (no more Prospect) — `src/lib/location-status.ts` centralizes `defaultStatusForCategory`/`statusOptionsForCategory`/`STATUS_LABELS`. Design firms/contractors keep Prospect → Active → Inactive, with auto-promotion to Active when a Lunch & Learn is marked completed (`updateLunchLearn` in `actions/locations.ts`). New `LocationStatusSelect` client component wired onto the location profile page (replacing the old static badge) so a rep can manually flip a design firm/contractor to Inactive if they don't want to work with us — this was previously impossible since `updateLocationStatus` existed but was never called from any UI.
+- `LocationFormDialog` and `createFromScan`/Smart Scan now pick the correct default/allowed statuses based on the company's category instead of always defaulting to `prospect`.
+- Company profile pages (`/companies/[id]`) now show a contact count per branch card, with a highlighted "No contacts yet" warning (red, `UserX` icon) so it's obvious which branches still need contact info collected.
+- Migration `0009_distributor_status_cleanup.sql` backfills existing distributor locations that were seeded/created as `prospect` (mostly Dave's Norcal imports) to `active`, matching the new UI rule.
+
 ## Google Maps scraping gotchas (if ever scraping a Maps list again)
 
 - Clicking a sidebar list item auto-scrolls the list, which invalidates previously-cached element refs/positions even though the ref ID looks still valid. Always re-`find` the target element by its unique name text immediately before each click — never reuse a ref captured before an intervening click.

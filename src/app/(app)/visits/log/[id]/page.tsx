@@ -28,7 +28,9 @@ export default async function LogVisitPage({ params }: { params: Promise<{ id: s
   if (!location) notFound();
 
   const projects = await listProjectsForPicker();
-  const defaultOpportunityKind = location.companies?.category && location.companies.category !== "distributor" ? "spec" : "quote";
+  const category = location.companies?.category;
+  const defaultOpportunityKind =
+    category === "civil_engineering" || category === "landscape_architecture" ? "spec" : "quote";
 
   return (
     <div className="mx-auto max-w-lg space-y-6">

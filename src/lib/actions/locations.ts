@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { TERRITORY_OPTIONS } from "@/lib/territory";
-import type { DistributorType, LocationStatus, TerritoryRegion } from "@/lib/types";
+import { defaultStatusForCategory } from "@/lib/location-status";
+import type { CompanyCategory, DistributorType, LocationStatus, TerritoryRegion } from "@/lib/types";
 
 export interface FormState {
   error?: string;
@@ -20,7 +21,7 @@ export async function createLocation(_prevState: FormState, formData: FormData):
   const zip = String(formData.get("zip") ?? "").trim() || null;
   const distributorType = (String(formData.get("distributor_type") ?? "").trim() || null) as DistributorType | null;
   const territoryRegion = String(formData.get("territory_region") ?? "") as TerritoryRegion;
-  const status = String(formData.get("status") ?? "prospect") as LocationStatus;
+  let status = String(formData.get("status") ?? "prospect") as LocationStatus;
   const redirectTo = String(formData.get("redirectTo") ?? "");
 
   if (!name) return { error: "Name is required." };
@@ -31,6 +32,15 @@ export async function createLocation(_prevState: FormState, formData: FormData):
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return { error: "Not signed in." };
+
+  // Distributors don't have a "prospect" state — coerce server-side too, in case the
+  // client sent a stale/incorrect value (e.g. no company selected yet when the form
+  // was rendered).
+  if (companyId) {
+    const { data: companyRow } = await supabase.from("companies").select("category").eq("id", companyId).single();
+    const category = (companyRow?.category as CompanyCategory | undefined) ?? null;
+    if (category === "distributor" && status === "prospect") status = defaultStatusForCategory(category);
+  }
 
   const { data, error } = await supabase
     .from("locations")
@@ -58,12 +68,17 @@ export async function createLocation(_prevState: FormState, formData: FormData):
   return { success: true };
 }
 
-export async function updateLocationStatus(locationId: string, status: LocationStatus) {
+export async function updateLocationStatus(
+  locationId: string,
+  status: LocationStatus,
+  companyId?: string | null
+): Promise<{ error?: string } | void> {
   const supabase = await createClient();
   const { error } = await supabase.from("locations").update({ status }).eq("id", locationId);
-  if (error) throw new Error(error.message);
+  if (error) return { error: error.message };
   revalidatePath(`/locations/${locationId}`);
   revalidatePath("/");
+  if (companyId) revalidatePath(`/companies/${companyId}`);
 }
 
 // Deleting a location cascades to its contacts, visit notes, and opportunities via FK.
@@ -82,10 +97,28 @@ export async function updateLunchLearn(
   scheduledAt: string | null
 ): Promise<{ error?: string } | void> {
   const supabase = await createClient();
-  const { error } = await supabase
-    .from("locations")
-    .update({ lunch_learn_completed_at: completedAt, lunch_learn_scheduled_at: scheduledAt })
-    .eq("id", locationId);
+
+  const updates: { lunch_learn_completed_at: string | null; lunch_learn_scheduled_at: string | null; status?: LocationStatus } = {
+    lunch_learn_completed_at: completedAt,
+    lunch_learn_scheduled_at: scheduledAt,
+  };
+
+  // Completing a Lunch & Learn is what promotes a design firm/contractor from
+  // Prospect to Active. Only promote from Prospect — leave an explicit Inactive (a
+  // rep's deliberate "not interested" call) alone, and don't touch Active either.
+  if (completedAt) {
+    const { data: existing, error: fetchError } = await supabase
+      .from("locations")
+      .select("status, company_id")
+      .eq("id", locationId)
+      .single();
+    if (fetchError) return { error: fetchError.message };
+    if (existing.status === "prospect") updates.status = "active";
+    if (existing.company_id) revalidatePath(`/companies/${existing.company_id}`);
+  }
+
+  const { error } = await supabase.from("locations").update(updates).eq("id", locationId);
   if (error) return { error: error.message };
   revalidatePath(`/locations/${locationId}`);
+  revalidatePath("/");
 }

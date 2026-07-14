@@ -13,17 +13,12 @@ import { VisitNoteFormDialog } from "@/components/visit-note-form-dialog";
 import { OpportunityFormDialog } from "@/components/opportunity-form-dialog";
 import { DeleteButton } from "@/components/delete-button";
 import { LunchLearnCard } from "@/components/lunch-learn-card";
+import { LocationStatusSelect } from "@/components/location-status-select";
 import { deleteContact } from "@/lib/actions/contacts";
 import { deleteVisitNote } from "@/lib/actions/visits";
 import { deleteOpportunity } from "@/lib/actions/opportunities";
 import { deleteLocation } from "@/lib/actions/locations";
-import type { ActivityType, LocationStatus, OpportunityStage } from "@/lib/types";
-
-const STATUS_VARIANT: Record<LocationStatus, "default" | "secondary" | "outline"> = {
-  active: "default",
-  prospect: "secondary",
-  inactive: "outline",
-};
+import type { ActivityType, OpportunityStage } from "@/lib/types";
 
 const ACTIVITY_TYPE_LABEL: Record<ActivityType, string> = {
   visit: "Visit",
@@ -60,15 +55,27 @@ export default async function LocationProfilePage({ params }: { params: Promise<
 
   const contactsById = new Map(contacts.map((c) => [c.id, c]));
   const opportunitiesById = new Map(opportunities.map((o) => [o.id, o]));
-  const defaultOpportunityKind = location.companies?.category && location.companies.category !== "distributor" ? "spec" : "quote";
-  const isDesignFirm = !!location.companies?.category && location.companies.category !== "distributor";
+  const category = location.companies?.category;
+  // Distributors and contractors both sell/buy product directly, so their opportunities
+  // are "quotes" (project-linkable). Only design firms (civil engineering / landscape
+  // architecture) "spec" a job rather than quote it.
+  const defaultOpportunityKind =
+    category === "civil_engineering" || category === "landscape_architecture" ? "spec" : "quote";
+  // Lunch & Learn tracking applies to anyone who isn't a distributor (design firms and
+  // contractors) — distributors don't need a prospect/relationship-building phase.
+  const showsLunchLearn = !!category && category !== "distributor";
 
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-2">
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant={STATUS_VARIANT[location.status]}>{location.status}</Badge>
+            <LocationStatusSelect
+              locationId={location.id}
+              companyId={location.company_id}
+              status={location.status}
+              category={category}
+            />
             <Badge variant="outline">{TERRITORY_LABELS[location.territory_region]}</Badge>
             {location.distributor_type && <Badge variant="outline">{location.distributor_type}</Badge>}
           </div>
@@ -97,7 +104,7 @@ export default async function LocationProfilePage({ params }: { params: Promise<
         />
       </div>
 
-      {isDesignFirm && (
+      {showsLunchLearn && (
         <LunchLearnCard
           locationId={location.id}
           completedAt={location.lunch_learn_completed_at}

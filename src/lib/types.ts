@@ -118,6 +118,7 @@ export interface WonProjectSummary {
   amount: number | null;
   winner_company_id: string | null;
   winner_company_name: string | null;
+  winner_company_category: CompanyCategory | null;
   winner_location_name: string | null;
 }
 

@@ -15,27 +15,42 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { createLocation, type FormState } from "@/lib/actions/locations";
 import { TERRITORY_OPTIONS } from "@/lib/territory";
+import { defaultStatusForCategory, statusOptionsForCategory, STATUS_LABELS } from "@/lib/location-status";
 import { PlusCircle } from "lucide-react";
+import type { CompanyCategory } from "@/lib/types";
 
 const initialState: FormState = {};
 
 export function LocationFormDialog({
   companies,
   presetCompanyId,
+  presetCompanyCategory,
   triggerLabel = "Add Location",
   redirectTo,
 }: {
-  companies?: { id: string; name: string }[];
+  companies?: { id: string; name: string; category: CompanyCategory }[];
   presetCompanyId?: string;
+  presetCompanyCategory?: CompanyCategory;
   triggerLabel?: string;
   redirectTo?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [selectedCompanyId, setSelectedCompanyId] = useState<string | undefined>(undefined);
   const [state, formAction, pending] = useActionState(async (prevState: FormState, formData: FormData) => {
     const result = await createLocation(prevState, formData);
     if (result.success) setOpen(false);
     return result;
   }, initialState);
+
+  // Category drives which status options make sense: known up front for the "Add
+  // Location" button on a company's own profile page (presetCompanyCategory), or
+  // derived from whichever company the rep just picked in the dropdown otherwise.
+  // Unknown/independent locations get the full set — we can't assume they're not a
+  // distributor's branch.
+  const activeCategory =
+    presetCompanyCategory ?? companies?.find((c) => c.id === selectedCompanyId)?.category ?? undefined;
+  const statusOptions = statusOptionsForCategory(activeCategory);
+  const defaultStatus = defaultStatusForCategory(activeCategory);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -59,7 +74,7 @@ export function LocationFormDialog({
           ) : (
             <div className="space-y-2">
               <Label htmlFor="location-company">Parent company (optional)</Label>
-              <Select name="company_id">
+              <Select name="company_id" onValueChange={setSelectedCompanyId}>
                 <SelectTrigger id="location-company" className="w-full">
                   <SelectValue placeholder="Independent / none" />
                 </SelectTrigger>
@@ -92,14 +107,16 @@ export function LocationFormDialog({
             </div>
             <div className="space-y-2">
               <Label htmlFor="location-status">Status</Label>
-              <Select name="status" defaultValue="prospect">
+              <Select key={activeCategory ?? "unknown"} name="status" defaultValue={defaultStatus}>
                 <SelectTrigger id="location-status" className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="prospect">Prospect</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
+                  {statusOptions.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      {STATUS_LABELS[s]}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

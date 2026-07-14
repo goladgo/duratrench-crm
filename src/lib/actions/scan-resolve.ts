@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { defaultStatusForCategory } from "@/lib/location-status";
 import type { CompanyCategory, DistributorType, TerritoryRegion } from "@/lib/types";
 
 export interface ResolveScanResult {
@@ -26,6 +27,7 @@ export async function createFromScan(formData: FormData): Promise<ResolveScanRes
 
   if (mode !== "existing_location") {
     let companyId = String(formData.get("existing_company_id") ?? "") || null;
+    let resolvedCategory: CompanyCategory | null = null;
 
     if (mode === "new_company") {
       const companyName = String(formData.get("company_name") ?? "").trim();
@@ -39,6 +41,10 @@ export async function createFromScan(formData: FormData): Promise<ResolveScanRes
         .single();
       if (companyError) return { error: companyError.message };
       companyId = company.id;
+      resolvedCategory = category;
+    } else if (companyId) {
+      const { data: companyRow } = await supabase.from("companies").select("category").eq("id", companyId).single();
+      resolvedCategory = (companyRow?.category as CompanyCategory | undefined) ?? null;
     }
 
     const locationName = String(formData.get("location_name") ?? "").trim();
@@ -58,7 +64,7 @@ export async function createFromScan(formData: FormData): Promise<ResolveScanRes
         zip: String(formData.get("zip") ?? "").trim() || null,
         distributor_type: distributorType,
         territory_region: territoryRegion,
-        status: "prospect",
+        status: defaultStatusForCategory(resolvedCategory),
       })
       .select("id")
       .single();

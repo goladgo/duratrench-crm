@@ -152,14 +152,14 @@ export async function listWonProjects(): Promise<WonProjectSummary[]> {
   type WinningOpp = {
     id: string;
     amount: number | null;
-    locations: (Pick<{ id: string; name: string }, "id" | "name"> & { companies: CompanyRef | null }) | null;
+    locations: (Pick<{ id: string; name: string }, "id" | "name"> & { companies: CompanyRefWithCategory | null }) | null;
   };
   const oppById = new Map<string, WinningOpp>();
 
   if (opportunityIds.length > 0) {
     const { data: oppRows, error: oppsError } = await supabase
       .from("opportunities")
-      .select("id, amount, locations(id, name, companies(id, name))")
+      .select("id, amount, locations(id, name, companies(id, name, category))")
       .in("id", opportunityIds);
     if (oppsError) throw new Error(oppsError.message);
 
@@ -180,6 +180,7 @@ export async function listWonProjects(): Promise<WonProjectSummary[]> {
       amount: opp?.amount ?? null,
       winner_company_id: loc?.companies?.id ?? null,
       winner_company_name: loc?.companies?.name ?? null,
+      winner_company_category: (loc?.companies?.category as WonProjectSummary["winner_company_category"]) ?? null,
       winner_location_name: loc?.name ?? null,
     };
   });

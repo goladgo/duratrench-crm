@@ -59,6 +59,11 @@ export default async function ProjectsPage() {
     getDistributorRepPerformance(),
   ]);
 
+  // Sometimes the order comes straight from a contractor rather than through a
+  // distributor branch — worth calling those out separately since they're a
+  // different sales path, not a distributor win.
+  const contractorWonProjects = wonProjects.filter((p) => p.winner_company_category === "contractor");
+
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between gap-2">
@@ -190,6 +195,33 @@ export default async function ProjectsPage() {
               </Table>
             </CardContent>
           </Card>
+        )}
+      </div>
+
+      <div className="space-y-3">
+        <h2 className="text-lg font-medium">Projects Won by Contractors</h2>
+        {contractorWonProjects.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No projects won directly by a contractor yet.</p>
+        ) : (
+          <div className="space-y-3">
+            {contractorWonProjects.map((p) => (
+              <Card key={p.id}>
+                <CardContent className="flex items-center gap-3 py-4">
+                  <Trophy className="size-5 shrink-0 text-primary" />
+                  <div className="min-w-0 flex-1">
+                    <Link href={`/projects/${p.id}`} className="font-medium hover:underline">
+                      {p.name}
+                    </Link>
+                    <p className="text-sm text-muted-foreground">
+                      Won by {p.winner_company_name ?? p.winner_location_name ?? "—"}
+                      {p.winner_company_name && p.winner_location_name ? ` — ${p.winner_location_name}` : ""}
+                    </p>
+                  </div>
+                  <span className="shrink-0 text-sm font-medium">{formatMoney(p.amount)}</span>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
         )}
       </div>
     </div>

@@ -68,23 +68,26 @@ export async function listCompanies(categories: CompanyCategory[], search?: stri
   }));
 }
 
-// Per-branch overview stats shown on the parent company profile page — last visit
-// and a quick quote/spec count + dollar total, so a rep can see at a glance which
-// office needs attention without opening each one.
+// Per-branch overview stats shown on the parent company profile page — last visit,
+// a quick quote/spec count + dollar total, and a contact count, so a rep can see at a
+// glance which office needs attention (or still needs a contact at all) without
+// opening each one.
 export interface LocationStats {
   lastVisitDate: string | null;
   opportunityCount: number;
   opportunityTotal: number;
+  contactCount: number;
 }
 
 function summarizeLocationStats(
   locationIds: string[],
   visits: { location_id: string; visit_date: string }[],
-  opportunities: { location_id: string; amount: number | null }[]
+  opportunities: { location_id: string; amount: number | null }[],
+  contacts: { location_id: string }[]
 ): Map<string, LocationStats> {
   const map = new Map<string, LocationStats>();
   for (const id of locationIds) {
-    map.set(id, { lastVisitDate: null, opportunityCount: 0, opportunityTotal: 0 });
+    map.set(id, { lastVisitDate: null, opportunityCount: 0, opportunityTotal: 0, contactCount: 0 });
   }
 
   for (const v of visits) {
@@ -98,6 +101,12 @@ function summarizeLocationStats(
     if (!stats) continue;
     stats.opportunityCount += 1;
     stats.opportunityTotal += o.amount ?? 0;
+  }
+
+  for (const c of contacts) {
+    const stats = map.get(c.location_id);
+    if (!stats) continue;
+    stats.contactCount += 1;
   }
 
   return map;
@@ -120,17 +129,24 @@ export async function getCompany(id: string) {
   const locationIds = (locations ?? []).map((l) => l.id);
   let locationStats = new Map<string, LocationStats>();
   if (locationIds.length > 0) {
-    const [{ data: visitRows, error: visitsError }, { data: oppRows, error: oppsError }] = await Promise.all([
+    const [
+      { data: visitRows, error: visitsError },
+      { data: oppRows, error: oppsError },
+      { data: contactRows, error: contactsError },
+    ] = await Promise.all([
       supabase.from("visit_notes").select("location_id, visit_date").in("location_id", locationIds),
       supabase.from("opportunities").select("location_id, amount").in("location_id", locationIds),
+      supabase.from("contacts").select("location_id").in("location_id", locationIds),
     ]);
     if (visitsError) throw new Error(visitsError.message);
     if (oppsError) throw new Error(oppsError.message);
+    if (contactsError) throw new Error(contactsError.message);
 
     locationStats = summarizeLocationStats(
       locationIds,
       (visitRows ?? []) as { location_id: string; visit_date: string }[],
-      (oppRows ?? []) as { location_id: string; amount: number | null }[]
+      (oppRows ?? []) as { location_id: string; amount: number | null }[],
+      (contactRows ?? []) as { location_id: string }[]
     );
   }
 

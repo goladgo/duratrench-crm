@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LocationFormDialog } from "@/components/location-form-dialog";
 import { DeleteButton } from "@/components/delete-button";
 import { deleteCompany } from "@/lib/actions/companies";
-import { Utensils } from "lucide-react";
+import { Utensils, UserX } from "lucide-react";
 import type { LocationStatus, ProjectStage } from "@/lib/types";
 
 const CATEGORY_LABELS = {
@@ -109,7 +109,11 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-medium">Locations</h2>
-          <LocationFormDialog presetCompanyId={company.id} triggerLabel="Add Location" />
+          <LocationFormDialog
+            presetCompanyId={company.id}
+            presetCompanyCategory={company.category}
+            triggerLabel="Add Location"
+          />
         </div>
         {locations.length === 0 ? (
           <p className="text-sm text-muted-foreground">No locations under this company yet.</p>
@@ -137,6 +141,16 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
                         <p className="flex items-center gap-1.5 text-foreground">
                           <Utensils className="size-3.5 shrink-0 text-primary" />
                           Lunch &amp; Learn completed {loc.lunch_learn_completed_at}
+                        </p>
+                      )}
+                      {stats?.contactCount ? (
+                        <p>
+                          {stats.contactCount} contact{stats.contactCount === 1 ? "" : "s"}
+                        </p>
+                      ) : (
+                        <p className="flex items-center gap-1.5 font-medium text-destructive">
+                          <UserX className="size-3.5 shrink-0" />
+                          No contacts yet
                         </p>
                       )}
                       {stats?.lastVisitDate && <p>Last visit {stats.lastVisitDate}</p>}
