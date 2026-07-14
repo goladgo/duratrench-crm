@@ -74,7 +74,7 @@ export function LocationFormDialog({
           ) : (
             <div className="space-y-2">
               <Label htmlFor="location-company">Parent company (optional)</Label>
-              <Select name="company_id" onValueChange={setSelectedCompanyId}>
+              <Select name="company_id" onValueChange={(value) => setSelectedCompanyId(value ?? undefined)}>
                 <SelectTrigger id="location-company" className="w-full">
                   <SelectValue placeholder="Independent / none" />
                 </SelectTrigger>
