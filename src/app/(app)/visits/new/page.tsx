@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { listLocations } from "@/lib/queries/locations";
 import { listAllCompaniesForPicker } from "@/lib/queries/companies";
+import { TERRITORY_LABELS } from "@/lib/territory";
 import { LocationFormDialog } from "@/components/location-form-dialog";
 import { SmartScanButton } from "@/components/smart-scan-button";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,14 +24,14 @@ export default async function NewVisitPage({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">Log a Visit</h1>
-        <p className="text-muted-foreground">Where did you just stop?</p>
+        <h1 className="text-2xl font-semibold">Log Activity</h1>
+        <p className="text-muted-foreground">Which stop is this about?</p>
       </div>
 
       {params.logged === "1" && (
         <div className="flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-sm text-primary">
           <CheckCircle2 className="size-4" />
-          Visit saved. Ready for the next stop.
+          Activity saved. Ready for the next stop.
         </div>
       )}
 
@@ -72,7 +73,7 @@ export default async function NewVisitPage({
                       {loc.city ? ` · ${loc.city}, ${loc.state}` : ""}
                     </p>
                   </div>
-                  <Badge variant="outline">{loc.territory_region === "socal" ? "SoCal" : "Las Vegas"}</Badge>
+                  <Badge variant="outline">{TERRITORY_LABELS[loc.territory_region]}</Badge>
                 </CardHeader>
               </Card>
             </Link>

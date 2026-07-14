@@ -9,6 +9,7 @@ import { ProjectFormDialog } from "@/components/project-form-dialog";
 import { listLocations } from "@/lib/queries/locations";
 import { listPlannedVisits, listUpcomingLunchLearns } from "@/lib/queries/planner";
 import { listProjectsForDashboard } from "@/lib/queries/projects";
+import { TERRITORY_LABELS } from "@/lib/territory";
 import {
   addDays,
   formatISODate,
@@ -63,11 +64,17 @@ export default async function DashboardPage({
   const prevWeek = formatISODate(addDays(parseISODate(weekStart), -7));
   const nextWeek = formatISODate(addDays(parseISODate(weekStart), 7));
 
+  const territoriesPresent = Array.from(new Set(locations.map((l) => l.territory_region))).map(
+    (r) => TERRITORY_LABELS[r]
+  );
+
   return (
     <div className="space-y-8">
       <div>
         <h1 className="text-2xl font-semibold">Welcome back</h1>
-        <p className="text-muted-foreground">Southern California &amp; Las Vegas territory</p>
+        <p className="text-muted-foreground">
+          {territoriesPresent.length > 0 ? `${territoriesPresent.join(" & ")} territory` : "Your territory"}
+        </p>
       </div>
 
       <Link href="/visits/new">
@@ -75,8 +82,8 @@ export default async function DashboardPage({
           <CardContent className="flex items-center gap-3 py-4">
             <PlusCircle className="size-6 shrink-0 text-primary" />
             <div>
-              <p className="font-medium">Log a Visit</p>
-              <p className="text-sm text-muted-foreground">Just made a stop? Note it before you forget.</p>
+              <p className="font-medium">Log Activity</p>
+              <p className="text-sm text-muted-foreground">Just made a stop, call, or follow-up email? Note it before you forget.</p>
             </div>
           </CardContent>
         </Card>

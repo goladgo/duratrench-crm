@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { createLocation, type FormState } from "@/lib/actions/locations";
+import { TERRITORY_OPTIONS } from "@/lib/territory";
 import { PlusCircle } from "lucide-react";
 
 const initialState: FormState = {};
@@ -81,8 +82,11 @@ export function LocationFormDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="socal">SoCal</SelectItem>
-                  <SelectItem value="vegas">Las Vegas</SelectItem>
+                  {TERRITORY_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

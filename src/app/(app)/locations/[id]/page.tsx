@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getLocationProfile } from "@/lib/queries/locations";
 import { listProjectsForPicker } from "@/lib/queries/projects";
+import { TERRITORY_LABELS } from "@/lib/territory";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { User } from "lucide-react";
@@ -16,12 +17,18 @@ import { deleteContact } from "@/lib/actions/contacts";
 import { deleteVisitNote } from "@/lib/actions/visits";
 import { deleteOpportunity } from "@/lib/actions/opportunities";
 import { deleteLocation } from "@/lib/actions/locations";
-import type { LocationStatus, OpportunityStage } from "@/lib/types";
+import type { ActivityType, LocationStatus, OpportunityStage } from "@/lib/types";
 
 const STATUS_VARIANT: Record<LocationStatus, "default" | "secondary" | "outline"> = {
   active: "default",
   prospect: "secondary",
   inactive: "outline",
+};
+
+const ACTIVITY_TYPE_LABEL: Record<ActivityType, string> = {
+  visit: "Visit",
+  call: "Call",
+  email: "Email",
 };
 
 const STAGE_VARIANT: Record<OpportunityStage, "default" | "secondary" | "outline" | "destructive"> = {
@@ -52,6 +59,7 @@ export default async function LocationProfilePage({ params }: { params: Promise<
   const projects = await listProjectsForPicker();
 
   const contactsById = new Map(contacts.map((c) => [c.id, c]));
+  const opportunitiesById = new Map(opportunities.map((o) => [o.id, o]));
   const defaultOpportunityKind = location.companies?.category && location.companies.category !== "distributor" ? "spec" : "quote";
   const isDesignFirm = !!location.companies?.category && location.companies.category !== "distributor";
 
@@ -61,7 +69,7 @@ export default async function LocationProfilePage({ params }: { params: Promise<
         <div className="space-y-2">
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant={STATUS_VARIANT[location.status]}>{location.status}</Badge>
-            <Badge variant="outline">{location.territory_region === "socal" ? "SoCal" : "Las Vegas"}</Badge>
+            <Badge variant="outline">{TERRITORY_LABELS[location.territory_region]}</Badge>
             {location.distributor_type && <Badge variant="outline">{location.distributor_type}</Badge>}
           </div>
           <h1 className="text-2xl font-semibold">{location.name}</h1>
@@ -85,7 +93,7 @@ export default async function LocationProfilePage({ params }: { params: Promise<
           variant="outline"
           size="sm"
           label="Delete Location"
-          confirmMessage={`Delete "${location.name}"? This also deletes its ${contacts.length} contact(s), ${visitNotes.length} visit note(s), and ${opportunities.length} quote(s)/spec(s). This can't be undone.`}
+          confirmMessage={`Delete "${location.name}"? This also deletes its ${contacts.length} contact(s), ${visitNotes.length} logged activit${visitNotes.length === 1 ? "y" : "ies"}, and ${opportunities.length} quote(s)/spec(s). This can't be undone.`}
         />
       </div>
 
@@ -100,7 +108,7 @@ export default async function LocationProfilePage({ params }: { params: Promise<
       <Tabs defaultValue="contacts">
         <TabsList>
           <TabsTrigger value="contacts">Contacts ({contacts.length})</TabsTrigger>
-          <TabsTrigger value="visits">Visit Notes ({visitNotes.length})</TabsTrigger>
+          <TabsTrigger value="visits">Activity ({visitNotes.length})</TabsTrigger>
           <TabsTrigger value="opportunities">
             {defaultOpportunityKind === "quote" ? "Quotes" : "Specs"} ({opportunities.length})
           </TabsTrigger>
@@ -143,32 +151,44 @@ export default async function LocationProfilePage({ params }: { params: Promise<
 
         <TabsContent value="visits" className="space-y-3 pt-4">
           <div className="flex justify-end">
-            <VisitNoteFormDialog locationId={location.id} contacts={contacts} />
+            <VisitNoteFormDialog locationId={location.id} contacts={contacts} opportunities={opportunities} />
           </div>
           {visitNotes.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No visit notes yet.</p>
+            <p className="text-sm text-muted-foreground">No activity logged yet.</p>
           ) : (
-            visitNotes.map((v) => (
-              <Card key={v.id}>
-                <CardContent className="space-y-1 py-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium">{v.visit_date}</p>
-                      {v.follow_up_date && <Badge variant="outline">Follow up {v.follow_up_date}</Badge>}
+            visitNotes.map((v) => {
+              const linkedOpportunity = v.opportunity_id ? opportunitiesById.get(v.opportunity_id) : undefined;
+              return (
+                <Card key={v.id}>
+                  <CardContent className="space-y-1 py-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary">{ACTIVITY_TYPE_LABEL[v.activity_type]}</Badge>
+                        <p className="text-sm font-medium">{v.visit_date}</p>
+                        {v.follow_up_date && <Badge variant="outline">Follow up {v.follow_up_date}</Badge>}
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <VisitNoteFormDialog
+                          locationId={location.id}
+                          contacts={contacts}
+                          opportunities={opportunities}
+                          visitNote={v}
+                        />
+                        <DeleteButton
+                          action={deleteVisitNote}
+                          args={[v.id, location.id]}
+                          confirmMessage={`Delete this ${ACTIVITY_TYPE_LABEL[v.activity_type].toLowerCase()} log from ${v.visit_date}?`}
+                        />
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <VisitNoteFormDialog locationId={location.id} contacts={contacts} visitNote={v} />
-                      <DeleteButton
-                        action={deleteVisitNote}
-                        args={[v.id, location.id]}
-                        confirmMessage={`Delete this visit note from ${v.visit_date}?`}
-                      />
-                    </div>
-                  </div>
-                  <p className="text-sm text-muted-foreground">{v.notes}</p>
-                </CardContent>
-              </Card>
-            ))
+                    {linkedOpportunity && (
+                      <p className="text-sm text-muted-foreground">Re: {linkedOpportunity.title}</p>
+                    )}
+                    <p className="text-sm text-muted-foreground">{v.notes}</p>
+                  </CardContent>
+                </Card>
+              );
+            })
           )}
         </TabsContent>
 

@@ -1,11 +1,12 @@
 import Link from "next/link";
-import { Building2, HardHat, LayoutDashboard, PlusCircle, Users } from "lucide-react";
+import { Briefcase, Building2, HardHat, LayoutDashboard, PlusCircle, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { signOut } from "@/app/login/actions";
 
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/companies", label: "Distributors", icon: Building2 },
+  { href: "/projects", label: "Projects", icon: Briefcase },
   { href: "/firms", label: "Design Firms", icon: Users },
   { href: "/contractors", label: "Contractors", icon: HardHat },
 ];
@@ -34,7 +35,7 @@ export function TopNav({ email }: { email: string | null }) {
             render={
               <Link href="/visits/new">
                 <PlusCircle className="size-4" />
-                Log Visit
+                Log Activity
               </Link>
             }
           />

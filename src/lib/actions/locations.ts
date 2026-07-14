@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { TERRITORY_OPTIONS } from "@/lib/territory";
 import type { DistributorType, LocationStatus, TerritoryRegion } from "@/lib/types";
 
 export interface FormState {
@@ -23,7 +24,7 @@ export async function createLocation(_prevState: FormState, formData: FormData):
   const redirectTo = String(formData.get("redirectTo") ?? "");
 
   if (!name) return { error: "Name is required." };
-  if (!["socal", "vegas"].includes(territoryRegion)) return { error: "Choose a territory region." };
+  if (!TERRITORY_OPTIONS.some((o) => o.value === territoryRegion)) return { error: "Choose a territory region." };
 
   const supabase = await createClient();
   const {

@@ -1,11 +1,12 @@
 export type CompanyCategory = "distributor" | "civil_engineering" | "landscape_architecture" | "contractor";
 export type DistributorType = "waterworks" | "plumbing" | "both";
-export type TerritoryRegion = "socal" | "vegas";
+export type TerritoryRegion = "socal" | "vegas" | "norcal" | "northern_nevada" | "hawaii";
 export type LocationStatus = "prospect" | "active" | "inactive";
 export type OpportunityKind = "quote" | "spec";
 export type OpportunityStage = "quoted" | "negotiating" | "won" | "lost";
 export type PlannedVisitStatus = "planned" | "completed" | "skipped";
 export type ProjectStage = "quoted" | "won" | "lost";
+export type ActivityType = "visit" | "call" | "email";
 
 export interface Company {
   id: string;
@@ -55,6 +56,8 @@ export interface VisitNote {
   rep_id: string;
   location_id: string;
   contact_id: string | null;
+  activity_type: ActivityType;
+  opportunity_id: string | null;
   visit_date: string;
   notes: string;
   follow_up_date: string | null;
@@ -106,6 +109,24 @@ export interface ProjectQuote extends Opportunity {
 export interface ProjectDetail extends Project {
   specifying_company: Pick<Company, "id" | "name" | "category"> | null;
   quotes: ProjectQuote[];
+}
+
+export interface WonProjectSummary {
+  id: string;
+  name: string;
+  created_at: string;
+  amount: number | null;
+  winner_company_id: string | null;
+  winner_company_name: string | null;
+  winner_location_name: string | null;
+}
+
+export interface DistributorPerformance {
+  company_id: string;
+  company_name: string;
+  quote_count: number;
+  wins_count: number;
+  won_value: number;
 }
 
 export interface PlannedVisit {

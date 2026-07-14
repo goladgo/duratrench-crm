@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getCompany } from "@/lib/queries/companies";
 import { listProjectsBySpecifyingCompany } from "@/lib/queries/projects";
+import { TERRITORY_LABELS } from "@/lib/territory";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LocationFormDialog } from "@/components/location-form-dialog";
@@ -122,7 +123,7 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
                     <CardHeader className="space-y-1.5">
                       <div className="flex items-center justify-between">
                         <Badge variant={STATUS_VARIANT[loc.status]}>{loc.status}</Badge>
-                        <Badge variant="outline">{loc.territory_region === "socal" ? "SoCal" : "Las Vegas"}</Badge>
+                        <Badge variant="outline">{TERRITORY_LABELS[loc.territory_region]}</Badge>
                       </div>
                       <CardTitle className="text-base">{loc.name}</CardTitle>
                     </CardHeader>

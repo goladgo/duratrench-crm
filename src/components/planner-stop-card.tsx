@@ -53,7 +53,7 @@ export function PlannerStopCard({ stop }: { stop: PlannedVisitWithLocation }) {
         {loc && (
           <Button size="xs" variant="outline" nativeButton={false} render={<Link href={`/visits/log/${loc.id}`} />}>
             <ClipboardList className="size-3.5" />
-            Log Visit
+            Log Activity
           </Button>
         )}
         {stop.status !== "completed" ? (

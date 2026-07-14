@@ -20,12 +20,19 @@ import { createFromScan, type ResolveScanResult } from "@/lib/actions/scan-resol
 import { resizeImageToBase64 } from "@/lib/image-resize";
 import { withTimeout } from "@/lib/with-timeout";
 import { Camera, Loader2, CheckCircle2 } from "lucide-react";
-import type { CompanyCategory } from "@/lib/types";
+import { TERRITORY_OPTIONS } from "@/lib/territory";
+import type { CompanyCategory, TerritoryRegion } from "@/lib/types";
 
 const initialState: ResolveScanResult = {};
 
-function regionForState(state: string): "socal" | "vegas" {
-  return state.trim().toUpperCase() === "NV" ? "vegas" : "socal";
+// Best-effort default from the scanned card's state; CA and NV are ambiguous between
+// the two reps' territories, so this just picks a sensible default — the rep can
+// always change it in the dropdown before saving.
+function regionForState(state: string): TerritoryRegion {
+  const s = state.trim().toUpperCase();
+  if (s === "HI") return "hawaii";
+  if (s === "NV") return "vegas";
+  return "socal";
 }
 
 export function SmartScanButton({
@@ -159,8 +166,11 @@ export function SmartScanButton({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="socal">SoCal</SelectItem>
-                    <SelectItem value="vegas">Las Vegas</SelectItem>
+                    {TERRITORY_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -202,8 +212,11 @@ export function SmartScanButton({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="socal">SoCal</SelectItem>
-                    <SelectItem value="vegas">Las Vegas</SelectItem>
+                    {TERRITORY_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

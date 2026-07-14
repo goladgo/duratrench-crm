@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getLocationProfile } from "@/lib/queries/locations";
 import { listProjectsForPicker } from "@/lib/queries/projects";
+import { TERRITORY_LABELS } from "@/lib/territory";
 import { logVisitAndReturn } from "@/lib/actions/visits";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
@@ -23,7 +24,7 @@ export default async function LogVisitPage({ params }: { params: Promise<{ id: s
     notFound();
   }
 
-  const { location, contacts } = profile;
+  const { location, contacts, opportunities } = profile;
   if (!location) notFound();
 
   const projects = await listProjectsForPicker();
@@ -33,7 +34,7 @@ export default async function LogVisitPage({ params }: { params: Promise<{ id: s
     <div className="mx-auto max-w-lg space-y-6">
       <div>
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="outline">{location.territory_region === "socal" ? "SoCal" : "Las Vegas"}</Badge>
+          <Badge variant="outline">{TERRITORY_LABELS[location.territory_region]}</Badge>
           {location.companies?.name && <Badge variant="secondary">{location.companies.name}</Badge>}
         </div>
         <h1 className="text-2xl font-semibold">{location.name}</h1>
@@ -51,6 +52,21 @@ export default async function LogVisitPage({ params }: { params: Promise<{ id: s
 
       <form action={logVisitAndReturn} className="space-y-4">
         <input type="hidden" name="location_id" value={location.id} />
+
+        <div className="space-y-2">
+          <Label htmlFor="activity_type">Type</Label>
+          <Select name="activity_type" defaultValue="visit">
+            <SelectTrigger id="activity_type" className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="visit">Visit</SelectItem>
+              <SelectItem value="call">Call</SelectItem>
+              <SelectItem value="email">Email</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
         <div className="space-y-2">
           <Label htmlFor="notes">What happened?</Label>
           <Textarea
@@ -81,9 +97,28 @@ export default async function LogVisitPage({ params }: { params: Promise<{ id: s
           </div>
         )}
 
+        {opportunities.length > 0 && (
+          <div className="space-y-2">
+            <Label htmlFor="opportunity_id">Following up on a quote? (optional)</Label>
+            <Select name="opportunity_id">
+              <SelectTrigger id="opportunity_id" className="w-full">
+                <SelectValue placeholder="Not tied to a specific quote" />
+              </SelectTrigger>
+              <SelectContent>
+                {opportunities.map((o) => (
+                  <SelectItem key={o.id} value={o.id}>
+                    {o.title}
+                    {o.amount != null ? ` — $${o.amount.toLocaleString()}` : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2">
-            <Label htmlFor="visit_date">Visit date</Label>
+            <Label htmlFor="visit_date">Date</Label>
             <Input id="visit_date" name="visit_date" type="date" defaultValue={new Date().toISOString().slice(0, 10)} />
           </div>
           <div className="space-y-2">
@@ -93,7 +128,7 @@ export default async function LogVisitPage({ params }: { params: Promise<{ id: s
         </div>
 
         <Button type="submit" size="lg" className="w-full">
-          Save Visit
+          Save Activity
         </Button>
       </form>
 
