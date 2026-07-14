@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import type {
   Company,
+  CompanyCategory,
   DistributorPerformance,
   DistributorRepPerformance,
   Project,
@@ -186,16 +187,21 @@ export async function listWonProjects(): Promise<WonProjectSummary[]> {
   });
 }
 
-// Per-distributor scoreboard: how many quotes they've submitted, how many project
-// competitions they've won, and the total $ of those wins. Scoped to companies whose
-// category is "distributor" since that's who competes head-to-head on a project.
-export async function getDistributorPerformance(): Promise<DistributorPerformance[]> {
+// Shared scoreboard builder: how many quotes companies of a given category have
+// submitted, how many project competitions they've won, and the total $ of those
+// wins. `keep` decides which zero-activity rows to drop — distributors show up as
+// soon as they've quoted anything, while the contractor summary (see
+// getContractorPerformance) only cares about contractors that have actually won.
+async function getCompanyPerformanceByCategory(
+  category: CompanyCategory,
+  keep: (stats: { quote_count: number; wins_count: number; won_value: number }) => boolean
+): Promise<DistributorPerformance[]> {
   const supabase = await createClient();
 
   const { data: companyRows, error: companiesError } = await supabase
     .from("companies")
     .select("id, name")
-    .eq("category", "distributor");
+    .eq("category", category);
   if (companiesError) throw new Error(companiesError.message);
   const companies = (companyRows ?? []) as CompanyRef[];
   if (companies.length === 0) return [];
@@ -243,14 +249,32 @@ export async function getDistributorPerformance(): Promise<DistributorPerformanc
       const stats = statsByCompany.get(c.id) ?? { quote_count: 0, wins_count: 0, won_value: 0 };
       return { company_id: c.id, company_name: c.name, ...stats };
     })
-    .filter((c) => c.quote_count > 0)
+    .filter(keep)
     .sort((a, b) => b.won_value - a.won_value || b.wins_count - a.wins_count || b.quote_count - a.quote_count);
+}
+
+// Per-distributor scoreboard: how many quotes they've submitted, how many project
+// competitions they've won, and the total $ of those wins. Scoped to companies whose
+// category is "distributor" since that's who competes head-to-head on a project.
+export async function getDistributorPerformance(): Promise<DistributorPerformance[]> {
+  return getCompanyPerformanceByCategory("distributor", (c) => c.quote_count > 0);
+}
+
+// Per-contractor scoreboard, same shape as getDistributorPerformance but for direct
+// contractor orders. Per explicit user request this only surfaces contractors that
+// have actually won at least one project — a contractor who's quoted but never
+// closed shouldn't clutter this summary the way a distributor's quote volume does.
+export async function getContractorPerformance(): Promise<DistributorPerformance[]> {
+  return getCompanyPerformanceByCategory("contractor", (c) => c.wins_count > 0);
 }
 
 // Which individual contact (distributor rep) is on the winning quote for each won
 // project. Unlike getDistributorPerformance, this only looks at wins — a rep who's
 // quoted a lot but never won anything won't show up here, by design (this is a
-// leaderboard of who's actually closed, not a quote-volume count).
+// leaderboard of who's actually closed, not a quote-volume count). Scoped to
+// distributor-category companies only — a contractor who wins a project directly
+// isn't a "distributor rep," so they're excluded here and surfaced instead in the
+// Projects Won by Contractors summary.
 export async function getDistributorRepPerformance(): Promise<DistributorRepPerformance[]> {
   const supabase = await createClient();
 
@@ -268,7 +292,7 @@ export async function getDistributorRepPerformance(): Promise<DistributorRepPerf
 
   const { data: oppRows, error: oppsError } = await supabase
     .from("opportunities")
-    .select("id, amount, contact_id, contacts(id, name), locations(companies(id, name))")
+    .select("id, amount, contact_id, contacts(id, name), locations(companies(id, name, category))")
     .in("id", winningOpportunityIds);
   if (oppsError) throw new Error(oppsError.message);
 
@@ -278,7 +302,10 @@ export async function getDistributorRepPerformance(): Promise<DistributorRepPerf
     amount: number | null;
     contact_id: string | null;
     contacts: ContactRef | ContactRef[] | null;
-    locations: { companies: CompanyRef | CompanyRef[] | null } | { companies: CompanyRef | CompanyRef[] | null }[] | null;
+    locations:
+      | { companies: CompanyRefWithCategory | CompanyRefWithCategory[] | null }
+      | { companies: CompanyRefWithCategory | CompanyRefWithCategory[] | null }[]
+      | null;
   };
 
   const statsByContact = new Map<string, DistributorRepPerformance>();
@@ -289,6 +316,7 @@ export async function getDistributorRepPerformance(): Promise<DistributorRepPerf
 
     const loc = Array.isArray(row.locations) ? (row.locations[0] ?? null) : row.locations;
     const company = loc ? (Array.isArray(loc.companies) ? (loc.companies[0] ?? null) : loc.companies) : null;
+    if (company?.category !== "distributor") continue;
 
     const existing = statsByContact.get(contact.id) ?? {
       contact_id: contact.id,

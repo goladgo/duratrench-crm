@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProjectFormDialog } from "@/components/project-form-dialog";
 import {
+  getContractorPerformance,
   getDistributorPerformance,
   getDistributorRepPerformance,
   listProjectsForDashboard,
@@ -52,17 +53,14 @@ function ProjectRow({ project }: { project: ProjectListItem }) {
 }
 
 export default async function ProjectsPage() {
-  const [projects, wonProjects, distributorPerformance, distributorRepPerformance] = await Promise.all([
-    listProjectsForDashboard(200),
-    listWonProjects(),
-    getDistributorPerformance(),
-    getDistributorRepPerformance(),
-  ]);
-
-  // Sometimes the order comes straight from a contractor rather than through a
-  // distributor branch — worth calling those out separately since they're a
-  // different sales path, not a distributor win.
-  const contractorWonProjects = wonProjects.filter((p) => p.winner_company_category === "contractor");
+  const [projects, wonProjects, distributorPerformance, distributorRepPerformance, contractorPerformance] =
+    await Promise.all([
+      listProjectsForDashboard(200),
+      listWonProjects(),
+      getDistributorPerformance(),
+      getDistributorRepPerformance(),
+      getContractorPerformance(),
+    ]);
 
   return (
     <div className="space-y-8">
@@ -200,28 +198,37 @@ export default async function ProjectsPage() {
 
       <div className="space-y-3">
         <h2 className="text-lg font-medium">Projects Won by Contractors</h2>
-        {contractorWonProjects.length === 0 ? (
+        {contractorPerformance.length === 0 ? (
           <p className="text-sm text-muted-foreground">No projects won directly by a contractor yet.</p>
         ) : (
-          <div className="space-y-3">
-            {contractorWonProjects.map((p) => (
-              <Card key={p.id}>
-                <CardContent className="flex items-center gap-3 py-4">
-                  <Trophy className="size-5 shrink-0 text-primary" />
-                  <div className="min-w-0 flex-1">
-                    <Link href={`/projects/${p.id}`} className="font-medium hover:underline">
-                      {p.name}
-                    </Link>
-                    <p className="text-sm text-muted-foreground">
-                      Won by {p.winner_company_name ?? p.winner_location_name ?? "—"}
-                      {p.winner_company_name && p.winner_location_name ? ` — ${p.winner_location_name}` : ""}
-                    </p>
-                  </div>
-                  <span className="shrink-0 text-sm font-medium">{formatMoney(p.amount)}</span>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          <Card>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Contractor</TableHead>
+                    <TableHead className="text-right">Quotes</TableHead>
+                    <TableHead className="text-right">Wins</TableHead>
+                    <TableHead className="text-right">$ Won</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {contractorPerformance.map((c) => (
+                    <TableRow key={c.company_id}>
+                      <TableCell>
+                        <Link href={`/companies/${c.company_id}`} className="hover:underline">
+                          {c.company_name}
+                        </Link>
+                      </TableCell>
+                      <TableCell className="text-right">{c.quote_count}</TableCell>
+                      <TableCell className="text-right">{c.wins_count}</TableCell>
+                      <TableCell className="text-right">{formatMoney(c.won_value)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         )}
       </div>
     </div>
