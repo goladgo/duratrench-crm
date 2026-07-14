@@ -9,9 +9,9 @@ const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/companies", label: "Distributors", icon: Building2 },
   { href: "/visits/new", label: "Log Activity", icon: PlusCircle },
-  { href: "/projects", label: "Projects", icon: Briefcase },
   { href: "/firms", label: "Firms", icon: Users },
   { href: "/contractors", label: "Contractors", icon: HardHat },
+  { href: "/projects", label: "Projects", icon: Briefcase },
 ];
 
 export function BottomNav() {

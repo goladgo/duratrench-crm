@@ -59,20 +59,36 @@ export async function createOpportunity(_prevState: FormState, formData: FormDat
     projectId = resolved.projectId;
   }
 
-  const { error } = await supabase.from("opportunities").insert({
-    location_id: locationId,
-    contact_id: contactId,
-    project_id: projectId,
-    kind,
-    title,
-    product_line: productLine,
-    amount,
-    stage,
-    notes,
-    rep_id: user.id,
-  });
+  const { data: inserted, error } = await supabase
+    .from("opportunities")
+    .insert({
+      location_id: locationId,
+      contact_id: contactId,
+      project_id: projectId,
+      kind,
+      title,
+      product_line: productLine,
+      amount,
+      stage,
+      notes,
+      rep_id: user.id,
+    })
+    .select("id")
+    .single();
 
   if (error) return { error: error.message };
+
+  // See the matching comment in updateOpportunity: a quote created already marked
+  // "Won" (with a project attached) should promote that project too.
+  if (kind === "quote" && stage === "won" && projectId) {
+    const { error: projectError } = await supabase
+      .from("projects")
+      .update({ stage: "won", winning_opportunity_id: inserted.id })
+      .eq("id", projectId);
+    if (projectError) return { error: projectError.message };
+    revalidatePath(`/projects/${projectId}`);
+    revalidatePath("/projects");
+  }
 
   revalidatePath(`/locations/${locationId}`);
   revalidatePath("/");
@@ -99,7 +115,7 @@ export async function updateOpportunity(_prevState: FormState, formData: FormDat
 
   const supabase = await createClient();
 
-  let projectUpdate: { project_id: string | null } | Record<string, never> = {};
+  let projectId: string | null = null;
   if (kind === "quote") {
     const {
       data: { user },
@@ -107,19 +123,45 @@ export async function updateOpportunity(_prevState: FormState, formData: FormDat
     if (!user) return { error: "Not signed in." };
     const resolved = await resolveProjectId(supabase, formData, user.id);
     if (resolved.error) return { error: resolved.error };
-    projectUpdate = { project_id: resolved.projectId };
+    projectId = resolved.projectId;
   }
 
   const { error } = await supabase
     .from("opportunities")
-    .update({ contact_id: contactId, kind, title, product_line: productLine, amount, stage, notes, ...projectUpdate })
+    .update({
+      contact_id: contactId,
+      kind,
+      title,
+      product_line: productLine,
+      amount,
+      stage,
+      notes,
+      ...(kind === "quote" ? { project_id: projectId } : {}),
+    })
     .eq("id", id);
 
   if (error) return { error: error.message };
 
+  // A quote marked "Won" directly from its own edit form (rather than via the
+  // project's "Mark as winner" button) should still promote the project to won and
+  // record this quote as the winner, so the project's stage and the Won
+  // Projects/Distributor Performance views stay consistent no matter which form was
+  // used to mark it won. Unlike "Mark as winner", this does NOT delete competing
+  // quotes on the project — that deletion is a deliberate, confirmed action tied to
+  // the trophy button, not something to trigger from a plain stage-field edit.
+  if (kind === "quote" && stage === "won" && projectId) {
+    const { error: projectError } = await supabase
+      .from("projects")
+      .update({ stage: "won", winning_opportunity_id: id })
+      .eq("id", projectId);
+    if (projectError) return { error: projectError.message };
+    revalidatePath(`/projects/${projectId}`);
+    revalidatePath("/projects");
+  }
+
   revalidatePath(`/locations/${locationId}`);
   revalidatePath("/");
-  if ("project_id" in projectUpdate && projectUpdate.project_id) revalidatePath(`/projects/${projectUpdate.project_id}`);
+  if (projectId) revalidatePath(`/projects/${projectId}`);
   return { success: true };
 }
 
