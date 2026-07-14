@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import type {
   Company,
   DistributorPerformance,
+  DistributorRepPerformance,
   Project,
   ProjectDetail,
   ProjectListItem,
@@ -243,4 +244,64 @@ export async function getDistributorPerformance(): Promise<DistributorPerformanc
     })
     .filter((c) => c.quote_count > 0)
     .sort((a, b) => b.won_value - a.won_value || b.wins_count - a.wins_count || b.quote_count - a.quote_count);
+}
+
+// Which individual contact (distributor rep) is on the winning quote for each won
+// project. Unlike getDistributorPerformance, this only looks at wins — a rep who's
+// quoted a lot but never won anything won't show up here, by design (this is a
+// leaderboard of who's actually closed, not a quote-volume count).
+export async function getDistributorRepPerformance(): Promise<DistributorRepPerformance[]> {
+  const supabase = await createClient();
+
+  const { data: wonProjectRows, error: wonProjectsError } = await supabase
+    .from("projects")
+    .select("winning_opportunity_id")
+    .eq("stage", "won")
+    .not("winning_opportunity_id", "is", null);
+  if (wonProjectsError) throw new Error(wonProjectsError.message);
+
+  const winningOpportunityIds = ((wonProjectRows ?? []) as { winning_opportunity_id: string }[]).map(
+    (p) => p.winning_opportunity_id
+  );
+  if (winningOpportunityIds.length === 0) return [];
+
+  const { data: oppRows, error: oppsError } = await supabase
+    .from("opportunities")
+    .select("id, amount, contact_id, contacts(id, name), locations(companies(id, name))")
+    .in("id", winningOpportunityIds);
+  if (oppsError) throw new Error(oppsError.message);
+
+  type ContactRef = { id: string; name: string };
+  type Row = {
+    id: string;
+    amount: number | null;
+    contact_id: string | null;
+    contacts: ContactRef | ContactRef[] | null;
+    locations: { companies: CompanyRef | CompanyRef[] | null } | { companies: CompanyRef | CompanyRef[] | null }[] | null;
+  };
+
+  const statsByContact = new Map<string, DistributorRepPerformance>();
+  for (const row of (oppRows ?? []) as unknown as Row[]) {
+    if (!row.contact_id) continue;
+    const contact = Array.isArray(row.contacts) ? (row.contacts[0] ?? null) : row.contacts;
+    if (!contact) continue;
+
+    const loc = Array.isArray(row.locations) ? (row.locations[0] ?? null) : row.locations;
+    const company = loc ? (Array.isArray(loc.companies) ? (loc.companies[0] ?? null) : loc.companies) : null;
+
+    const existing = statsByContact.get(contact.id) ?? {
+      contact_id: contact.id,
+      contact_name: contact.name,
+      company_name: company?.name ?? null,
+      wins_count: 0,
+      won_value: 0,
+    };
+    existing.wins_count += 1;
+    existing.won_value += row.amount ?? 0;
+    statsByContact.set(contact.id, existing);
+  }
+
+  return Array.from(statsByContact.values()).sort(
+    (a, b) => b.won_value - a.won_value || b.wins_count - a.wins_count
+  );
 }

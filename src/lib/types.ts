@@ -129,6 +129,14 @@ export interface DistributorPerformance {
   won_value: number;
 }
 
+export interface DistributorRepPerformance {
+  contact_id: string;
+  contact_name: string;
+  company_name: string | null;
+  wins_count: number;
+  won_value: number;
+}
+
 export interface PlannedVisit {
   id: string;
   rep_id: string;

@@ -48,12 +48,16 @@ export default async function DashboardPage({
   const weekEnd = days[days.length - 1];
   const isCurrentWeek = weekStart === defaultWeekStart;
 
-  const [locations, plannedVisits, upcomingLunchLearns, projects] = await Promise.all([
+  const [locations, plannedVisits, upcomingLunchLearns, allProjects] = await Promise.all([
     listLocations(),
     listPlannedVisits(weekStart, weekEnd),
     listUpcomingLunchLearns(6),
     listProjectsForDashboard(),
   ]);
+
+  // Dashboard only surfaces open work — won/lost projects have their own home on the
+  // Projects tab now (stage tabs there, plus the Won Projects section).
+  const openProjects = allProjects.filter((p) => p.stage === "quoted");
 
   const stopsByDate = new Map<string, PlannedVisitWithLocation[]>();
   for (const day of days) stopsByDate.set(day, []);
@@ -162,16 +166,16 @@ export default async function DashboardPage({
 
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-medium">Projects</h2>
+          <h2 className="text-lg font-medium">Open Projects</h2>
           <ProjectFormDialog />
         </div>
-        {projects.length === 0 ? (
+        {openProjects.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No projects yet — log a quote from a branch and tag it to a project, or start one here.
+            No open projects — log a quote from a branch and tag it to a project, or start one here.
           </p>
         ) : (
           <div className="max-h-[560px] divide-y overflow-y-auto rounded-lg border">
-            {projects.map((p) => (
+            {openProjects.map((p) => (
               <Link
                 key={p.id}
                 href={`/projects/${p.id}`}

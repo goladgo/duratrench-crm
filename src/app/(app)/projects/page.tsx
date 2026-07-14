@@ -5,7 +5,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProjectFormDialog } from "@/components/project-form-dialog";
-import { getDistributorPerformance, listProjectsForDashboard, listWonProjects } from "@/lib/queries/projects";
+import {
+  getDistributorPerformance,
+  getDistributorRepPerformance,
+  listProjectsForDashboard,
+  listWonProjects,
+} from "@/lib/queries/projects";
 import type { ProjectListItem, ProjectStage } from "@/lib/types";
 
 const PROJECT_STAGE_VARIANT: Record<ProjectStage, "default" | "secondary" | "destructive"> = {
@@ -47,10 +52,11 @@ function ProjectRow({ project }: { project: ProjectListItem }) {
 }
 
 export default async function ProjectsPage() {
-  const [projects, wonProjects, distributorPerformance] = await Promise.all([
+  const [projects, wonProjects, distributorPerformance, distributorRepPerformance] = await Promise.all([
     listProjectsForDashboard(200),
     listWonProjects(),
     getDistributorPerformance(),
+    getDistributorRepPerformance(),
   ]);
 
   return (
@@ -146,6 +152,38 @@ export default async function ProjectsPage() {
                       <TableCell className="text-right">{d.quote_count}</TableCell>
                       <TableCell className="text-right">{d.wins_count}</TableCell>
                       <TableCell className="text-right">{formatMoney(d.won_value)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      <div className="space-y-3">
+        <h2 className="text-lg font-medium">Distributor Rep Performance</h2>
+        {distributorRepPerformance.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No projects won yet.</p>
+        ) : (
+          <Card>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Rep</TableHead>
+                    <TableHead>Distributor</TableHead>
+                    <TableHead className="text-right">Wins</TableHead>
+                    <TableHead className="text-right">$ Won</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {distributorRepPerformance.map((r) => (
+                    <TableRow key={r.contact_id}>
+                      <TableCell>{r.contact_name}</TableCell>
+                      <TableCell className="text-muted-foreground">{r.company_name ?? "—"}</TableCell>
+                      <TableCell className="text-right">{r.wins_count}</TableCell>
+                      <TableCell className="text-right">{formatMoney(r.won_value)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
