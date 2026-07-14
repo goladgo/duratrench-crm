@@ -86,7 +86,7 @@ export default async function ProjectsPage() {
               {filtered.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Nothing here yet.</p>
               ) : (
-                <div className="divide-y rounded-lg border">
+                <div className="max-h-[560px] divide-y overflow-y-auto rounded-lg border">
                   {filtered.map((p) => (
                     <ProjectRow key={p.id} project={p} />
                   ))}

@@ -144,6 +144,7 @@ export interface PlannedVisit {
   location_id: string;
   planned_date: string;
   status: PlannedVisitStatus;
+  position: number;
   notes: string | null;
   created_at: string;
 }

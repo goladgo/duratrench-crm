@@ -3,9 +3,8 @@ import { Building2, ChevronLeft, ChevronRight, HardHat, PlusCircle, Users, Utens
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { AddStopDialog } from "@/components/add-stop-dialog";
-import { PlannerStopCard } from "@/components/planner-stop-card";
 import { ProjectFormDialog } from "@/components/project-form-dialog";
+import { WeeklyPlannerBoard } from "@/components/weekly-planner-board";
 import { listLocations } from "@/lib/queries/locations";
 import { listPlannedVisits, listUpcomingLunchLearns } from "@/lib/queries/planner";
 import { listProjectsForDashboard } from "@/lib/queries/projects";
@@ -59,11 +58,16 @@ export default async function DashboardPage({
   // Projects tab now (stage tabs there, plus the Won Projects section).
   const openProjects = allProjects.filter((p) => p.stage === "quoted");
 
-  const stopsByDate = new Map<string, PlannedVisitWithLocation[]>();
-  for (const day of days) stopsByDate.set(day, []);
+  const stopsByDay = new Map<string, PlannedVisitWithLocation[]>();
+  for (const day of days) stopsByDay.set(day, []);
   for (const stop of plannedVisits) {
-    stopsByDate.get(stop.planned_date)?.push(stop);
+    stopsByDay.get(stop.planned_date)?.push(stop);
   }
+  const stopsByDate = days.map((day, i) => ({
+    date: day,
+    weekdayLabel: WEEKDAY_LABELS[i],
+    stops: stopsByDay.get(day) ?? [],
+  }));
 
   const prevWeek = formatISODate(addDays(parseISODate(weekStart), -7));
   const nextWeek = formatISODate(addDays(parseISODate(weekStart), 7));
@@ -116,26 +120,7 @@ export default async function DashboardPage({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          {days.map((day, i) => {
-            const stops = stopsByDate.get(day) ?? [];
-            const dayLabel = `${WEEKDAY_LABELS[i]}, ${formatShortLabel(day)}`;
-            return (
-              <div key={day} className="space-y-2 rounded-lg border p-3">
-                <div>
-                  <p className="text-sm font-medium">{WEEKDAY_LABELS[i]}</p>
-                  <p className="text-xs text-muted-foreground">{formatShortLabel(day)}</p>
-                </div>
-                <div className="space-y-2">
-                  {stops.map((stop) => (
-                    <PlannerStopCard key={stop.id} stop={stop} />
-                  ))}
-                </div>
-                <AddStopDialog date={day} dayLabel={dayLabel} locations={locations} />
-              </div>
-            );
-          })}
-        </div>
+        <WeeklyPlannerBoard stopsByDate={stopsByDate} locations={locations} />
       </div>
 
       <div className="space-y-3">
