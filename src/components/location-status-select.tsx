@@ -27,7 +27,8 @@ export function LocationStatusSelect({
   const [error, setError] = useState<string | null>(null);
   const options = statusOptionsForCategory(category);
 
-  function handleChange(value: string) {
+  function handleChange(value: string | null) {
+    if (!value) return;
     const next = value as LocationStatus;
     const prev = current;
     setCurrent(next);
