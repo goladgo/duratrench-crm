@@ -90,6 +90,16 @@ Reps:
 
 **Open:** still no non-design-firm "all my activities" *export* (the in-app weekly activities card above covers the "overview" need, but nothing to download/forward). Dave's Design Firm report has no backlog floor yet — only added for Albert so far, per session 6.
 
+## Status as of 2026-07-17 (session 8): Design Firm PDF restructured — grouped by firm, contact/activity-triggered
+
+**Done — no schema change this session, `src/lib/queries/reports.ts` and the PDF route rewritten:**
+- Dropped the "New Design Firms" concept entirely (used to be `companies.created_at > since`). A firm now only appears in the report if something actually happened there since the last report — a new contact, or a new activity (visit/call/email/Lunch & Learn) — regardless of when the company record itself was created. This was a deliberate simplification: a rep bulk-importing their existing firm list (companies with no contacts/activity yet) would otherwise flood the engineer's report with hundreds of do-nothing rows. Confirmed against real data before shipping: 8 of Albert's firms have new contacts, 16 have new activity, 7 locations have new Lunch & Learn updates since his floor date.
+- New `groupReportDataByCompany()` in `reports.ts` buckets the flat contact/activity rows by `company_id` so everything about one firm (contacts, activity) prints together under one heading — no more separate "New Contacts" / "Activity Notes" flat sections a reader had to cross-reference by name. Heading is just `Firm Name — City` (no category label, no "New" badge — both were tried this session and explicitly walked back by the user in favor of simplicity).
+- Lunch & Learn scheduling *and* completion now both count as "activity" line items (label "Lunch & Learn Scheduled" / "Lunch & Learn Completed"), same list as visit/call/email — previously these were a separate 4th section. Since `locations` has no separate timestamp for "when scheduled" vs. "when completed" (only one shared `updated_at`), a completed L&L supersedes showing it as merely "scheduled" too, rather than risk implying two events.
+- `NewFirmRow` and `ScheduledLunchLearnRow` types removed; `ActivityRow` and `NewContactRow` both gained `companyId`/`city` so grouping has something reliable to key off (previously only had denormalized `companyName` strings).
+
+**Open:** same as session 7 — no "all my activities" export, no Dave backlog floor yet.
+
 ## Google Maps scraping gotchas (if ever scraping a Maps list again)
 
 - Clicking a sidebar list item auto-scrolls the list, which invalidates previously-cached element refs/positions even though the ref ID looks still valid. Always re-`find` the target element by its unique name text immediately before each click — never reuse a ref captured before an intervening click.

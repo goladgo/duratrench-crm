@@ -196,10 +196,11 @@ export default async function ReportsPage() {
             <CardTitle className="text-base">Design Firm Activity</CardTitle>
           </div>
           <p className="text-sm text-muted-foreground">
-            A PDF of your new civil engineering &amp; landscape architecture firms (with address),
-            new contacts, activity notes, and any newly scheduled Lunch &amp; Learns — everything
-            added since you last generated this report. Forward it to the product engineering team
-            so they can update their contacts spreadsheet.
+            A PDF grouped by civil engineering &amp; landscape architecture firm — only firms with a
+            new contact or new activity (visits, calls, emails, or a Lunch &amp; Learn scheduled or
+            completed) since you last generated this report. Firms with no new activity are left out,
+            so bulk-imported firms don&apos;t flood the report. Forward it to the product engineering
+            team so they can update their contacts spreadsheet.
           </p>
         </CardHeader>
         <CardContent className="space-y-3">

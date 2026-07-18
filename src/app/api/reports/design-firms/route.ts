@@ -4,21 +4,16 @@ import {
   FIRST_REPORT_SINCE,
   getDesignFirmReportData,
   getLastReportRunForRep,
+  groupReportDataByCompany,
   recordReportRun,
   reportDataIsEmpty,
-  type DesignFirmReportData,
+  type CompanyReportGroup,
 } from "@/lib/queries/reports";
 import { getRepReportFloor, getRepTerritories } from "@/lib/reps";
 import { TERRITORY_LABELS } from "@/lib/territory";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
-const CATEGORY_LABELS: Record<string, string> = {
-  civil_engineering: "Civil Engineering",
-  landscape_architecture: "Landscape Architecture",
-};
-const ACTIVITY_LABELS: Record<string, string> = { visit: "Visit", call: "Call", email: "Email" };
 
 const PAGE_W = 612;
 const PAGE_H = 792;
@@ -108,81 +103,58 @@ class Layout {
     }
   }
 
-  sectionHeading(title: string, count: number) {
-    this.ensure(30);
-    this.gap(8);
-    this.page.drawText(`${title} (${count})`, {
-      x: MARGIN,
-      y: this.y - 12,
-      size: 12,
-      font: this.bold,
-      color: ACCENT,
-    });
-    this.y -= 16;
+  // Company block heading: bold name, muted city alongside. Also draws a light rule
+  // above to visually separate one firm's block from the next.
+  companyHeading(name: string, city: string | null) {
+    this.ensure(28);
+    this.gap(10);
     this.page.drawLine({
       start: { x: MARGIN, y: this.y },
       end: { x: PAGE_W - MARGIN, y: this.y },
       thickness: 0.75,
       color: RULE,
     });
-    this.y -= 8;
+    this.y -= 14;
+    const heading = city ? `${name}  —  ${city}` : name;
+    this.page.drawText(heading, { x: MARGIN, y: this.y - 12, size: 12.5, font: this.bold, color: ACCENT });
+    this.y -= 18;
+  }
+
+  subheading(title: string) {
+    this.ensure(16);
+    this.page.drawText(title, { x: MARGIN + 6, y: this.y - 10, size: 9.5, font: this.bold, color: MUTED });
+    this.y -= 14;
   }
 }
 
-function renderSections(L: Layout, data: DesignFirmReportData) {
-  // New Design Firms
-  L.sectionHeading("New Design Firms", data.firms.length);
-  if (data.firms.length === 0) {
-    L.text("None since last report.", { color: MUTED, size: 9.5 });
-  } else {
-    for (const f of data.firms) {
-      L.text(`${f.companyName}  —  ${CATEGORY_LABELS[f.category] ?? f.category}`, { font: L.bold, size: 10.5 });
-      if (f.address) L.text(f.address, { color: MUTED, size: 9.5, indent: 10 });
-      L.text(`Added ${fmtDate(f.createdAt)}`, { color: MUTED, size: 9, indent: 10 });
-      L.gap(4);
-    }
-  }
+function renderCompanyGroups(L: Layout, groups: CompanyReportGroup[]) {
+  for (const g of groups) {
+    L.companyHeading(g.companyName, g.city);
 
-  // New Contacts
-  L.sectionHeading("New Contacts", data.contacts.length);
-  if (data.contacts.length === 0) {
-    L.text("None since last report.", { color: MUTED, size: 9.5 });
-  } else {
-    for (const c of data.contacts) {
-      const titlePart = c.title ? `, ${c.title}` : "";
-      L.text(`${c.contactName}${titlePart}`, { font: L.bold, size: 10.5 });
-      L.text(`${c.companyName}${c.officeName ? ` — ${c.officeName}` : ""}`, { color: MUTED, size: 9.5, indent: 10 });
-      const reach = [c.phone, c.email].filter(Boolean).join("   ·   ");
-      if (reach) L.text(reach, { size: 9.5, indent: 10 });
-      L.gap(4);
+    if (g.contacts.length > 0) {
+      L.subheading(`New Contacts (${g.contacts.length})`);
+      for (const c of g.contacts) {
+        const titlePart = c.title ? `, ${c.title}` : "";
+        L.text(`${c.contactName}${titlePart}`, { font: L.bold, size: 10.5, indent: 12 });
+        const reach = [c.phone, c.email].filter(Boolean).join("   ·   ");
+        const officeLine = [c.officeName, reach].filter(Boolean).join("   ·   ");
+        if (officeLine) L.text(officeLine, { color: MUTED, size: 9.5, indent: 20 });
+        L.gap(3);
+      }
     }
-  }
 
-  // Activity Notes
-  L.sectionHeading("Activity Notes", data.activity.length);
-  if (data.activity.length === 0) {
-    L.text("None since last report.", { color: MUTED, size: 9.5 });
-  } else {
-    for (const a of data.activity) {
-      const who = a.contactName ? ` · ${a.contactName}` : "";
-      L.text(`${fmtDate(a.activityDate)} · ${ACTIVITY_LABELS[a.activityType] ?? a.activityType} · ${a.companyName}${a.officeName ? ` (${a.officeName})` : ""}${who}`, {
-        font: L.bold,
-        size: 10,
-      });
-      L.text(a.notes, { size: 9.5, indent: 10 });
-      L.gap(4);
-    }
-  }
-
-  // Scheduled Lunch & Learns
-  L.sectionHeading("Scheduled Lunch & Learns", data.lunchLearns.length);
-  if (data.lunchLearns.length === 0) {
-    L.text("None newly scheduled since last report.", { color: MUTED, size: 9.5 });
-  } else {
-    for (const ll of data.lunchLearns) {
-      L.text(`${fmtDate(ll.scheduledAt)} · ${ll.companyName}${ll.officeName ? ` — ${ll.officeName}` : ""}${ll.city ? ` (${ll.city})` : ""}`, {
-        size: 10,
-      });
+    if (g.activity.length > 0) {
+      L.subheading(`Activity (${g.activity.length})`);
+      for (const a of g.activity) {
+        const who = a.contactName ? ` · ${a.contactName}` : "";
+        L.text(`${fmtDate(a.date)} · ${a.label}${a.officeName ? ` (${a.officeName})` : ""}${who}`, {
+          font: L.bold,
+          size: 10,
+          indent: 12,
+        });
+        if (a.notes) L.text(a.notes, { size: 9.5, indent: 20 });
+        L.gap(3);
+      }
     }
   }
 }
@@ -203,6 +175,7 @@ export async function GET() {
   const since = floor && floor > watermark ? floor : watermark;
 
   const data = await getDesignFirmReportData(since);
+  const groups = groupReportDataByCompany(data);
 
   const doc = await PDFDocument.create();
   const font = await doc.embedFont(StandardFonts.Helvetica);
@@ -225,13 +198,14 @@ export async function GET() {
     }`,
     { color: MUTED, size: 10 }
   );
+  L.text(`${groups.length} firm${groups.length === 1 ? "" : "s"} with new activity`, { color: MUTED, size: 10 });
   L.gap(6);
 
   if (reportDataIsEmpty(data)) {
     L.gap(10);
     L.text("No new design firm activity since your last report.", { size: 11 });
   } else {
-    renderSections(L, data);
+    renderCompanyGroups(L, groups);
   }
 
   const bytes = await doc.save();

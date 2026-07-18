@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import type { ActivityType, CompanyCategory } from "@/lib/types";
+import type { CompanyCategory } from "@/lib/types";
 
 // Backs the per-rep "Design Firm Activity" PDF a rep generates on-demand from /reports.
 // The product engineering team keeps its own separate contacts spreadsheet (no CRM
@@ -8,6 +8,12 @@ import type { ActivityType, CompanyCategory } from "@/lib/types";
 // (rep_id = auth.uid()) -- each rep reports their own territory's activity, and each rep
 // has an independent "since last generated" watermark, so two reps can each send fresh
 // updates without stepping on each other or duplicating rows.
+//
+// A firm only shows up in the report if something actually *happened* there (a contact
+// was added, or an activity was logged) since the last report -- not just because the
+// company record exists. This matters because reps bulk-importing their existing
+// distributor/firm list into the CRM would otherwise flood the engineer with hundreds of
+// firms that have no real update to report.
 
 const DESIGN_FIRM_CATEGORIES: CompanyCategory[] = ["civil_engineering", "landscape_architecture"];
 
@@ -36,44 +42,42 @@ export async function getLastReportRunForRep(repId: string): Promise<DesignFirmR
   return (data as DesignFirmReportRun | null) ?? null;
 }
 
-export interface NewFirmRow {
-  companyName: string;
-  category: CompanyCategory;
-  address: string | null;
-  createdAt: string;
-}
-
 export interface NewContactRow {
+  companyId: string;
+  companyName: string;
+  officeName: string;
+  city: string | null;
   contactName: string;
   title: string | null;
   phone: string | null;
   email: string | null;
-  companyName: string;
-  officeName: string;
-  createdAt: string;
 }
 
+// A unified "something happened" row -- a visit/call/email, or a Lunch & Learn getting
+// scheduled or marked completed. Lunch & Learns count as activity too since they're a
+// meaningful touchpoint the engineer should know about, same as a visit or call.
 export interface ActivityRow {
-  activityType: ActivityType;
-  activityDate: string;
-  notes: string;
-  companyName: string;
-  officeName: string;
-  contactName: string | null;
-}
-
-export interface ScheduledLunchLearnRow {
+  companyId: string;
   companyName: string;
   officeName: string;
   city: string | null;
-  scheduledAt: string;
+  contactName: string | null;
+  label: string; // "Visit" | "Call" | "Email" | "Lunch & Learn Scheduled" | "Lunch & Learn Completed"
+  date: string;
+  notes: string;
 }
 
 export interface DesignFirmReportData {
-  firms: NewFirmRow[];
   contacts: NewContactRow[];
   activity: ActivityRow[];
-  lunchLearns: ScheduledLunchLearnRow[];
+}
+
+export interface CompanyReportGroup {
+  companyId: string;
+  companyName: string;
+  city: string | null;
+  contacts: NewContactRow[];
+  activity: ActivityRow[];
 }
 
 // Embedded PostgREST relations come back as either an object or a single-element array
@@ -83,92 +87,42 @@ function one<T>(rel: T | T[] | null | undefined): T | null {
   return rel ?? null;
 }
 
-function buildAddress(parts: {
-  address?: string | null;
-  city?: string | null;
-  state?: string | null;
-  zip?: string | null;
-}): string | null {
-  const line1 = parts.address?.trim() || "";
-  const cityState = [parts.city?.trim(), parts.state?.trim()].filter(Boolean).join(", ");
-  const tail = [cityState, parts.zip?.trim()].filter(Boolean).join(" ");
-  const full = [line1, tail].filter(Boolean).join(", ");
-  return full || null;
-}
-
-// Everything new for this rep since `since`. All four queries are RLS-scoped to the
-// rep automatically, and category-filtered to design firms via inner joins.
+// Everything new for this rep since `since`. Both queries are RLS-scoped to the rep
+// automatically, and category-filtered to design firms via inner joins.
 export async function getDesignFirmReportData(since: string): Promise<DesignFirmReportData> {
   const supabase = await createClient();
 
-  const [firmRes, contactRes, activityRes, llRes] = await Promise.all([
-    supabase
-      .from("companies")
-      .select("id, name, category, created_at")
-      .in("category", DESIGN_FIRM_CATEGORIES)
-      .gt("created_at", since)
-      .order("created_at"),
+  const [contactRes, activityRes, llRes] = await Promise.all([
     supabase
       .from("contacts")
-      .select("name, title, phone, email, created_at, locations!inner(name, companies!inner(name, category))")
+      .select(
+        "name, title, phone, email, created_at, locations!inner(company_id, name, city, companies!inner(name, category))"
+      )
       .in("locations.companies.category", DESIGN_FIRM_CATEGORIES)
       .gt("created_at", since)
       .order("created_at"),
     supabase
       .from("visit_notes")
       .select(
-        "activity_type, visit_date, notes, created_at, contacts(name), locations!inner(name, companies!inner(name, category))"
+        "activity_type, visit_date, notes, created_at, contacts(name), locations!inner(company_id, name, city, companies!inner(name, category))"
       )
       .in("locations.companies.category", DESIGN_FIRM_CATEGORIES)
       .gt("created_at", since)
       .order("created_at"),
     supabase
       .from("locations")
-      .select("name, city, lunch_learn_scheduled_at, updated_at, companies!inner(name, category)")
+      .select("company_id, name, city, lunch_learn_scheduled_at, lunch_learn_completed_at, updated_at, companies!inner(name, category)")
       .in("companies.category", DESIGN_FIRM_CATEGORIES)
-      .not("lunch_learn_scheduled_at", "is", null)
+      .or("lunch_learn_scheduled_at.not.is.null,lunch_learn_completed_at.not.is.null")
       .gt("updated_at", since)
-      .order("lunch_learn_scheduled_at"),
+      .order("updated_at"),
   ]);
 
-  if (firmRes.error) throw new Error(firmRes.error.message);
   if (contactRes.error) throw new Error(contactRes.error.message);
   if (activityRes.error) throw new Error(activityRes.error.message);
   if (llRes.error) throw new Error(llRes.error.message);
 
-  // Pull addresses for the new firms from their locations (companies have no address of
-  // their own -- it lives on the branch/office row).
-  type FirmCompany = { id: string; name: string; category: CompanyCategory; created_at: string };
-  const firmCompanies = (firmRes.data ?? []) as FirmCompany[];
-  const firmIds = firmCompanies.map((c) => c.id);
-
-  const addressByCompany = new Map<string, string>();
-  if (firmIds.length > 0) {
-    const { data: locRows, error: locError } = await supabase
-      .from("locations")
-      .select("company_id, address, city, state, zip, created_at")
-      .in("company_id", firmIds)
-      .order("created_at");
-    if (locError) throw new Error(locError.message);
-    for (const l of (locRows ?? []) as {
-      company_id: string;
-      address: string | null;
-      city: string | null;
-      state: string | null;
-      zip: string | null;
-    }[]) {
-      if (addressByCompany.has(l.company_id)) continue; // first (earliest) office wins
-      const addr = buildAddress(l);
-      if (addr) addressByCompany.set(l.company_id, addr);
-    }
-  }
-
-  const firms: NewFirmRow[] = firmCompanies.map((c) => ({
-    companyName: c.name,
-    category: c.category,
-    address: addressByCompany.get(c.id) ?? null,
-    createdAt: c.created_at,
-  }));
+  type LocJoin = { company_id: string; name: string; city: string | null; companies: { name: string } | { name: string }[] | null };
 
   type ContactJoin = {
     name: string;
@@ -176,60 +130,101 @@ export async function getDesignFirmReportData(since: string): Promise<DesignFirm
     phone: string | null;
     email: string | null;
     created_at: string;
-    locations: { name: string; companies: { name: string } | { name: string }[] | null } | { name: string; companies: { name: string } | { name: string }[] | null }[] | null;
+    locations: LocJoin | LocJoin[] | null;
   };
   const contacts: NewContactRow[] = ((contactRes.data ?? []) as unknown as ContactJoin[]).map((c) => {
     const loc = one(c.locations);
     const company = one(loc?.companies);
     return {
+      companyId: loc?.company_id ?? "",
+      companyName: company?.name ?? "",
+      officeName: loc?.name ?? "",
+      city: loc?.city ?? null,
       contactName: c.name,
       title: c.title,
       phone: c.phone,
       email: c.email,
-      companyName: company?.name ?? "",
-      officeName: loc?.name ?? "",
-      createdAt: c.created_at,
     };
   });
 
-  type ActivityJoin = {
-    activity_type: ActivityType;
+  type VisitJoin = {
+    activity_type: "visit" | "call" | "email";
     visit_date: string;
     notes: string;
     contacts: { name: string } | { name: string }[] | null;
-    locations: { name: string; companies: { name: string } | { name: string }[] | null } | { name: string; companies: { name: string } | { name: string }[] | null }[] | null;
+    locations: LocJoin | LocJoin[] | null;
   };
-  const activity: ActivityRow[] = ((activityRes.data ?? []) as unknown as ActivityJoin[]).map((a) => {
+  const ACTIVITY_LABEL: Record<string, string> = { visit: "Visit", call: "Call", email: "Email" };
+  const visitActivity: ActivityRow[] = ((activityRes.data ?? []) as unknown as VisitJoin[]).map((a) => {
     const loc = one(a.locations);
     const company = one(loc?.companies);
     const contact = one(a.contacts);
     return {
-      activityType: a.activity_type,
-      activityDate: a.visit_date,
-      notes: a.notes,
+      companyId: loc?.company_id ?? "",
       companyName: company?.name ?? "",
       officeName: loc?.name ?? "",
+      city: loc?.city ?? null,
       contactName: contact?.name ?? null,
+      label: ACTIVITY_LABEL[a.activity_type] ?? a.activity_type,
+      date: a.visit_date,
+      notes: a.notes,
     };
   });
 
   type LLJoin = {
+    company_id: string;
     name: string;
     city: string | null;
-    lunch_learn_scheduled_at: string;
+    lunch_learn_scheduled_at: string | null;
+    lunch_learn_completed_at: string | null;
     companies: { name: string } | { name: string }[] | null;
   };
-  const lunchLearns: ScheduledLunchLearnRow[] = ((llRes.data ?? []) as unknown as LLJoin[]).map((l) => {
+  const lunchLearnActivity: ActivityRow[] = ((llRes.data ?? []) as unknown as LLJoin[]).map((l) => {
     const company = one(l.companies);
+    // If it's been marked completed, that supersedes "scheduled" as the more relevant,
+    // final state -- there's no separate timestamp for when it was scheduled vs.
+    // completed, so showing both would risk implying two separate events.
+    const completed = l.lunch_learn_completed_at;
+    const scheduled = l.lunch_learn_scheduled_at;
     return {
+      companyId: l.company_id,
       companyName: company?.name ?? "",
       officeName: l.name,
       city: l.city,
-      scheduledAt: l.lunch_learn_scheduled_at,
+      contactName: null,
+      label: completed ? "Lunch & Learn Completed" : "Lunch & Learn Scheduled",
+      date: (completed ?? scheduled) as string,
+      notes: "",
     };
   });
 
-  return { firms, contacts, activity, lunchLearns };
+  const activity = [...visitActivity, ...lunchLearnActivity].sort((a, b) => (a.date < b.date ? 1 : -1));
+
+  return { contacts, activity };
+}
+
+export function groupReportDataByCompany(data: DesignFirmReportData): CompanyReportGroup[] {
+  const groups = new Map<string, CompanyReportGroup>();
+
+  function ensure(companyId: string, companyName: string, city: string | null): CompanyReportGroup {
+    let g = groups.get(companyId);
+    if (!g) {
+      g = { companyId, companyName, city, contacts: [], activity: [] };
+      groups.set(companyId, g);
+    } else if (!g.city && city) {
+      g.city = city;
+    }
+    return g;
+  }
+
+  for (const c of data.contacts) {
+    ensure(c.companyId, c.companyName, c.city).contacts.push(c);
+  }
+  for (const a of data.activity) {
+    ensure(a.companyId, a.companyName, a.city).activity.push(a);
+  }
+
+  return Array.from(groups.values()).sort((a, b) => a.companyName.localeCompare(b.companyName));
 }
 
 export async function recordReportRun(userId: string, userEmail: string): Promise<void> {
@@ -241,10 +236,5 @@ export async function recordReportRun(userId: string, userEmail: string): Promis
 }
 
 export function reportDataIsEmpty(data: DesignFirmReportData): boolean {
-  return (
-    data.firms.length === 0 &&
-    data.contacts.length === 0 &&
-    data.activity.length === 0 &&
-    data.lunchLearns.length === 0
-  );
+  return data.contacts.length === 0 && data.activity.length === 0;
 }
