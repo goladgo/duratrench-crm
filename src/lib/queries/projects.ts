@@ -20,7 +20,7 @@ export async function listProjectsForDashboard(limit = 50): Promise<ProjectListI
   const { data: projectRows, error: projectsError } = await supabase
     .from("projects")
     .select(
-      "id, rep_id, name, notes, stage, specifying_company_id, winning_opportunity_id, created_at, companies(id, name)"
+      "id, rep_id, name, notes, stage, specifying_company_id, winning_opportunity_id, won_at, created_at, companies(id, name)"
     )
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -54,6 +54,7 @@ export async function listProjectsForDashboard(limit = 50): Promise<ProjectListI
       stage: p.stage,
       specifying_company_id: p.specifying_company_id,
       winning_opportunity_id: p.winning_opportunity_id,
+      won_at: p.won_at,
       created_at: p.created_at,
       specifying_company: company,
       quote_count: countByProject.get(p.id) ?? 0,
@@ -67,7 +68,7 @@ export async function getProject(id: string): Promise<ProjectDetail | null> {
   const { data: projectRow, error: projectError } = await supabase
     .from("projects")
     .select(
-      "id, rep_id, name, notes, stage, specifying_company_id, winning_opportunity_id, created_at, companies(id, name, category)"
+      "id, rep_id, name, notes, stage, specifying_company_id, winning_opportunity_id, won_at, created_at, companies(id, name, category)"
     )
     .eq("id", id)
     .maybeSingle();
@@ -95,6 +96,7 @@ export async function getProject(id: string): Promise<ProjectDetail | null> {
     stage: p.stage,
     specifying_company_id: p.specifying_company_id,
     winning_opportunity_id: p.winning_opportunity_id,
+    won_at: p.won_at,
     created_at: p.created_at,
     specifying_company: company as Pick<Company, "id" | "name" | "category"> | null,
     quotes: (quoteRows ?? []) as unknown as ProjectQuote[],

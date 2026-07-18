@@ -81,6 +81,15 @@ Reps:
 
 **Open:** still no non-design-firm "all my activities" report (deferred again). Leaked-password-protection auth advisor is a pre-existing project setting, unrelated to these changes.
 
+## Status as of 2026-07-17 (session 7): Weekly overview cards on /reports (in-app, no export)
+
+**Done — migration 0013 applied via the Supabase MCP:**
+- Added `projects.won_at timestamptz` (migration `0013_projects_won_at.sql`). Neither `projects` nor `opportunities` previously tracked *when* a project was won — `opportunities.close_date` exists in the schema but is never set anywhere in the app. Rather than a generic `updated_at` (which would false-positive on an unrelated rename), `won_at` is set only in the three code paths that actually transition a project to `won`: `declareProjectWinner` (`actions/projects.ts`), and the two "quote created/edited already marked Won" paths in `actions/opportunities.ts` (`createOpportunity`/`updateOpportunity`). `reopenProject` clears it back to `null`. `Project`/`ProjectListItem`/`ProjectDetail` and the two query functions in `queries/projects.ts` that build those types (`listProjectsForDashboard`, `getProject`) were updated to select/return it — existing 12 already-won projects have `won_at = null` (no backfill; correctly means they don't retroactively show up in "won this week", verified).
+- New `src/lib/queries/weekly-report.ts`: three plain RLS-scoped reads (no RPC, no watermark, always the current Mon–Sun week) — `getWeeklyActivity` (visit_notes by `visit_date`, with counts by type), `getWeeklyQuotes` (opportunities by `quote_date`, both `kind` values), `getWeeklyWonProjects` (projects where `stage = 'won'` and `won_at` in week, joined through `winning_opportunity_id` for amount/company/location).
+- `/reports` now has three new view-only cards above the Design Firm Activity PDF card: "This Week's Activities" (count by visit/call/email + scrollable list), "This Week's Quotes" (list with Quote/Spec + stage badges and $ total), "Projects Won This Week" (list with $ total). None of these are exportable — that was an explicit user choice ("I don't need to export it, just make it look nice") — they're just always-current-week summaries that repaint on page load.
+
+**Open:** still no non-design-firm "all my activities" *export* (the in-app weekly activities card above covers the "overview" need, but nothing to download/forward). Dave's Design Firm report has no backlog floor yet — only added for Albert so far, per session 6.
+
 ## Google Maps scraping gotchas (if ever scraping a Maps list again)
 
 - Clicking a sidebar list item auto-scrolls the list, which invalidates previously-cached element refs/positions even though the ref ID looks still valid. Always re-`find` the target element by its unique name text immediately before each click — never reuse a ref captured before an intervening click.

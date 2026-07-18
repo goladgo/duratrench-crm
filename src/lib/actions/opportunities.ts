@@ -83,11 +83,12 @@ export async function createOpportunity(_prevState: FormState, formData: FormDat
   if (kind === "quote" && stage === "won" && projectId) {
     const { error: projectError } = await supabase
       .from("projects")
-      .update({ stage: "won", winning_opportunity_id: inserted.id })
+      .update({ stage: "won", winning_opportunity_id: inserted.id, won_at: new Date().toISOString() })
       .eq("id", projectId);
     if (projectError) return { error: projectError.message };
     revalidatePath(`/projects/${projectId}`);
     revalidatePath("/projects");
+    revalidatePath("/reports");
   }
 
   revalidatePath(`/locations/${locationId}`);
@@ -152,11 +153,12 @@ export async function updateOpportunity(_prevState: FormState, formData: FormDat
   if (kind === "quote" && stage === "won" && projectId) {
     const { error: projectError } = await supabase
       .from("projects")
-      .update({ stage: "won", winning_opportunity_id: id })
+      .update({ stage: "won", winning_opportunity_id: id, won_at: new Date().toISOString() })
       .eq("id", projectId);
     if (projectError) return { error: projectError.message };
     revalidatePath(`/projects/${projectId}`);
     revalidatePath("/projects");
+    revalidatePath("/reports");
   }
 
   revalidatePath(`/locations/${locationId}`);

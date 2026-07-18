@@ -89,6 +89,7 @@ export interface Project {
   stage: ProjectStage;
   specifying_company_id: string | null;
   winning_opportunity_id: string | null;
+  won_at: string | null;
   created_at: string;
 }
 

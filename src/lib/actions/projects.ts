@@ -74,7 +74,7 @@ export async function reopenProject(id: string): Promise<{ error?: string }> {
   const supabase = await createClient();
   const { error } = await supabase
     .from("projects")
-    .update({ stage: "quoted", winning_opportunity_id: null })
+    .update({ stage: "quoted", winning_opportunity_id: null, won_at: null })
     .eq("id", id);
   if (error) return { error: error.message };
   revalidatePath(`/projects/${id}`);
@@ -106,12 +106,13 @@ export async function declareProjectWinner(projectId: string, winningOpportunity
 
   const { error: projectError } = await supabase
     .from("projects")
-    .update({ stage: "won", winning_opportunity_id: winningOpportunityId })
+    .update({ stage: "won", winning_opportunity_id: winningOpportunityId, won_at: new Date().toISOString() })
     .eq("id", projectId);
   if (projectError) return { error: projectError.message };
 
   revalidatePath(`/projects/${projectId}`);
   revalidatePath("/");
+  revalidatePath("/reports");
   return {};
 }
 
