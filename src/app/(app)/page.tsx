@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Building2, ChevronLeft, ChevronRight, HardHat, PlusCircle, Users, Utensils } from "lucide-react";
+import { Building2, ChevronLeft, ChevronRight, FileText, HardHat, PlusCircle, Users, Utensils } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,8 @@ import { listLocations } from "@/lib/queries/locations";
 import { listPlannedVisits, listUpcomingLunchLearns } from "@/lib/queries/planner";
 import { listProjectsForDashboard } from "@/lib/queries/projects";
 import { TERRITORY_LABELS } from "@/lib/territory";
+import { getRepTerritories } from "@/lib/reps";
+import { createClient } from "@/lib/supabase/server";
 import {
   addDays,
   formatISODate,
@@ -31,6 +33,7 @@ const SHORTCUTS = [
   { href: "/companies", label: "Distributors", icon: Building2 },
   { href: "/firms", label: "Design Firms", icon: Users },
   { href: "/contractors", label: "Contractors", icon: HardHat },
+  { href: "/reports", label: "Reports", icon: FileText },
 ];
 
 const WEEK_PARAM_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -47,11 +50,13 @@ export default async function DashboardPage({
   const weekEnd = days[days.length - 1];
   const isCurrentWeek = weekStart === defaultWeekStart;
 
-  const [locations, plannedVisits, upcomingLunchLearns, allProjects] = await Promise.all([
+  const supabase = await createClient();
+  const [locations, plannedVisits, upcomingLunchLearns, allProjects, { data: { user } }] = await Promise.all([
     listLocations(),
     listPlannedVisits(weekStart, weekEnd),
     listUpcomingLunchLearns(6),
     listProjectsForDashboard(),
+    supabase.auth.getUser(),
   ]);
 
   // Dashboard only surfaces open work — won/lost projects have their own home on the
@@ -72,7 +77,8 @@ export default async function DashboardPage({
   const prevWeek = formatISODate(addDays(parseISODate(weekStart), -7));
   const nextWeek = formatISODate(addDays(parseISODate(weekStart), 7));
 
-  const territoriesPresent = Array.from(new Set(locations.map((l) => l.territory_region))).map(
+  const locationTerritories = Array.from(new Set(locations.map((l) => l.territory_region)));
+  const territoriesPresent = getRepTerritories(user?.email, locationTerritories).map(
     (r) => TERRITORY_LABELS[r]
   );
 
