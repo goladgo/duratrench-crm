@@ -1,5 +1,13 @@
 import { createClient } from "@/lib/supabase/server";
-import type { CompanyCategory, CompanyRollup, Company, Location } from "@/lib/types";
+import type {
+  CompanyCategory,
+  CompanyRollup,
+  Company,
+  Location,
+  DesignFirmAcrossReps,
+  CrossRepContact,
+  CrossRepLocation,
+} from "@/lib/types";
 
 // Summary of Lunch & Learn status across a company's offices, for the list-card
 // overview. Only surfaces completed sessions (most recent one wins), since that's
@@ -163,4 +171,89 @@ export async function listAllCompaniesForPicker() {
   const { data, error } = await supabase.from("companies").select("id, name, category").order("name");
   if (error) throw new Error(error.message);
   return (data ?? []) as Pick<Company, "id" | "name" | "category">[];
+}
+
+// Cross-rep visibility for design firms only (civil_engineering / landscape_architecture)
+// -- backs the "show all reps" checkbox on /firms and /companies/[id]. Distributor and
+// contractor data is intentionally never exposed this way (see migration 0014's comment
+// for the rationale: this is a deliberate, narrow carve-out of RLS for one specific,
+// user-requested benefit -- seeing whether another rep already has a contact or ran a
+// Lunch & Learn at a firm -- not a general cross-rep data leak).
+//
+// Each rep's copy of a firm stays its own row here (not merged into one card per firm
+// name) since there's no shared identity linking, say, Albert's "Kimley-Horn" company
+// row to Dave's -- merging would need fuzzy name-matching logic that's out of scope.
+type DesignFirmAcrossRepsRow = {
+  company_id: string;
+  company_name: string;
+  category: CompanyCategory;
+  rep_id: string;
+  rep_email: string;
+  location_count: number | string;
+  contact_count: number | string;
+  last_visit_date: string | null;
+  lunch_learn_completed_at: string | null;
+};
+
+export async function listAllDesignFirmsAcrossReps(): Promise<DesignFirmAcrossReps[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("get_all_design_firms_across_reps");
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as DesignFirmAcrossRepsRow[]).map((r) => ({
+    companyId: r.company_id,
+    companyName: r.company_name,
+    category: r.category,
+    repId: r.rep_id,
+    repEmail: r.rep_email,
+    // Postgres bigint counts can come back as strings over PostgREST -- normalize to number.
+    locationCount: Number(r.location_count),
+    contactCount: Number(r.contact_count),
+    lastVisitDate: r.last_visit_date,
+    lunchLearnCompletedAt: r.lunch_learn_completed_at,
+  }));
+}
+
+type DesignFirmLocationRow = {
+  location_id: string;
+  location_name: string;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  status: Location["status"];
+  lunch_learn_scheduled_at: string | null;
+  lunch_learn_completed_at: string | null;
+  rep_id: string;
+  rep_email: string;
+  last_visit_date: string | null;
+  contacts: CrossRepContact[] | null;
+};
+
+// Every location on file for a design firm with this exact name (case/whitespace
+// insensitive), across every rep. `excludeRepId` drops the viewing rep's own locations
+// since those are already shown in the page's normal "Your Offices" section -- this is
+// purely the "what do OTHER reps have" addition.
+export async function getDesignFirmLocationsAcrossReps(
+  companyName: string,
+  excludeRepId?: string
+): Promise<CrossRepLocation[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("get_design_firm_locations_by_name", {
+    p_company_name: companyName,
+  });
+  if (error) throw new Error(error.message);
+  const rows = ((data ?? []) as DesignFirmLocationRow[]).map((r) => ({
+    locationId: r.location_id,
+    locationName: r.location_name,
+    address: r.address,
+    city: r.city,
+    state: r.state,
+    status: r.status,
+    lunchLearnScheduledAt: r.lunch_learn_scheduled_at,
+    lunchLearnCompletedAt: r.lunch_learn_completed_at,
+    repId: r.rep_id,
+    repEmail: r.rep_email,
+    lastVisitDate: r.last_visit_date,
+    contacts: r.contacts ?? [],
+  }));
+  return excludeRepId ? rows.filter((r) => r.repId !== excludeRepId) : rows;
 }

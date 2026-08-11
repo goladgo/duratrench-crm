@@ -172,3 +172,41 @@ export interface CompanyRollup {
 export interface LocationWithCompany extends Location {
   companies: Pick<Company, "id" | "name" | "category"> | null;
 }
+
+// Cross-rep, design-firm-only visibility (civil_engineering / landscape_architecture)
+// backed by SECURITY DEFINER RPCs -- see migration 0014. Deliberately NOT extending
+// Company/Location since these rows carry a rep_id/rep_email that isn't on those types
+// and are read-only (no id-based edit path back into another rep's row).
+export interface DesignFirmAcrossReps {
+  companyId: string;
+  companyName: string;
+  category: CompanyCategory;
+  repId: string;
+  repEmail: string;
+  locationCount: number;
+  contactCount: number;
+  lastVisitDate: string | null;
+  lunchLearnCompletedAt: string | null;
+}
+
+export interface CrossRepContact {
+  name: string;
+  title: string | null;
+  phone: string | null;
+  email: string | null;
+}
+
+export interface CrossRepLocation {
+  locationId: string;
+  locationName: string;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  status: LocationStatus;
+  lunchLearnScheduledAt: string | null;
+  lunchLearnCompletedAt: string | null;
+  repId: string;
+  repEmail: string;
+  lastVisitDate: string | null;
+  contacts: CrossRepContact[];
+}

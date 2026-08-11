@@ -1,14 +1,17 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getCompany } from "@/lib/queries/companies";
+import { getCompany, getDesignFirmLocationsAcrossReps } from "@/lib/queries/companies";
 import { listProjectsBySpecifyingCompany } from "@/lib/queries/projects";
+import { createClient } from "@/lib/supabase/server";
+import { getRepLabel } from "@/lib/reps";
 import { TERRITORY_LABELS } from "@/lib/territory";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LocationFormDialog } from "@/components/location-form-dialog";
 import { DeleteButton } from "@/components/delete-button";
+import { CheckboxFilter } from "@/components/checkbox-filter";
 import { deleteCompany } from "@/lib/actions/companies";
-import { Utensils, UserX } from "lucide-react";
+import { Utensils, UserX, Users } from "lucide-react";
 import type { LocationStatus, ProjectStage } from "@/lib/types";
 
 const CATEGORY_LABELS = {
@@ -36,8 +39,16 @@ function formatMoney(value: number) {
   return value.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 }
 
-export default async function CompanyProfilePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function CompanyProfilePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ allLocations?: string }>;
+}) {
   const { id } = await params;
+  const { allLocations } = await searchParams;
+  const showAllLocations = allLocations === "1";
 
   let data;
   try {
@@ -52,6 +63,17 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
   const oppNoun = company.category === "distributor" ? "Quote" : "Spec";
   const isDesignFirm = DESIGN_FIRM_CATEGORIES.includes(company.category);
   const specifiedProjects = isDesignFirm ? await listProjectsBySpecifyingCompany(company.id) : [];
+
+  // Cross-rep visibility is design-firm-only (see migration 0014) -- distributor/
+  // contractor data stays strictly rep-exclusive.
+  let otherRepLocations: Awaited<ReturnType<typeof getDesignFirmLocationsAcrossReps>> = [];
+  if (isDesignFirm && showAllLocations) {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    otherRepLocations = await getDesignFirmLocationsAcrossReps(company.name, user?.id);
+  }
 
   return (
     <div className="space-y-6">
@@ -107,13 +129,16 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
       </div>
 
       <div className="space-y-3">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-medium">Locations</h2>
-          <LocationFormDialog
-            presetCompanyId={company.id}
-            presetCompanyCategory={company.category}
-            triggerLabel="Add Location"
-          />
+          <div className="flex items-center gap-4">
+            {isDesignFirm && <CheckboxFilter paramName="allLocations" label="Show other reps' offices" />}
+            <LocationFormDialog
+              presetCompanyId={company.id}
+              presetCompanyCategory={company.category}
+              triggerLabel="Add Location"
+            />
+          </div>
         </div>
         {locations.length === 0 ? (
           <p className="text-sm text-muted-foreground">No locations under this company yet.</p>
@@ -168,6 +193,67 @@ export default async function CompanyProfilePage({ params }: { params: Promise<{
           </div>
         )}
       </div>
+
+      {isDesignFirm && showAllLocations && (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Users className="size-4 shrink-0 text-primary" />
+            <h2 className="text-lg font-medium">Other Reps&apos; Offices</h2>
+          </div>
+          {otherRepLocations.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No other rep has this firm on file yet.
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {otherRepLocations.map((loc) => (
+                <Card key={loc.locationId} className="h-full">
+                  <CardHeader className="space-y-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <Badge variant={STATUS_VARIANT[loc.status]}>{loc.status}</Badge>
+                      <Badge variant="outline">{getRepLabel(loc.repEmail)}</Badge>
+                    </div>
+                    <CardTitle className="text-base">{loc.locationName}</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-1.5 text-sm text-muted-foreground">
+                    {loc.city && (
+                      <p>
+                        {loc.city}
+                        {loc.state ? `, ${loc.state}` : ""}
+                      </p>
+                    )}
+                    {loc.lunchLearnCompletedAt && (
+                      <p className="flex items-center gap-1.5 text-foreground">
+                        <Utensils className="size-3.5 shrink-0 text-primary" />
+                        Lunch &amp; Learn completed {loc.lunchLearnCompletedAt}
+                      </p>
+                    )}
+                    {loc.lastVisitDate && <p>Last visit {loc.lastVisitDate}</p>}
+                    {loc.contacts.length === 0 ? (
+                      <p className="flex items-center gap-1.5 font-medium text-destructive">
+                        <UserX className="size-3.5 shrink-0" />
+                        No contacts yet
+                      </p>
+                    ) : (
+                      <div className="space-y-1 pt-1">
+                        {loc.contacts.map((c, i) => (
+                          <p key={i} className="text-foreground">
+                            {c.name}
+                            {c.title ? `, ${c.title}` : ""}
+                            {c.phone || c.email ? (
+                              <span className="text-muted-foreground"> · {[c.phone, c.email].filter(Boolean).join(" · ")}</span>
+                            ) : null}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {isDesignFirm && (
         <div className="space-y-3">

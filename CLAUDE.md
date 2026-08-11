@@ -100,6 +100,37 @@ Reps:
 
 **Open:** same as session 7 — no "all my activities" export, no Dave backlog floor yet.
 
+## Status as of 2026-07-17 (session 9): Bulk-uploaded Dave's Norcal design firm prospect list
+
+**Done — no schema change, data-only via the Supabase MCP `execute_sql`:**
+- User attached `NorCal_Engineering_Landscape_Prospects.pdf` (25 Northern-CA-area civil engineering / landscape architecture firms) and asked me to load it into Dave Land's account so he doesn't have to hand-type it. Inserted 22 `civil_engineering` + 3 `landscape_architecture` companies under Dave's `rep_id`, each with one `locations` row (`territory_region = 'norcal'`, `status = 'prospect'`), via one atomic `WITH ... INSERT ... RETURNING` statement matching company↔location rows by name within the batch.
+- 12 firms had no address in the source PDF and 2 had city-only; filled in real street addresses via WebSearch (one query per firm) rather than leaving them blank. Verified afterward: 0 rows with a null address across the 25.
+- Two judgment calls flagged to the user, not yet confirmed/corrected: `GEI Consultants, Inc.` — picked the Rancho Cordova/Sacramento office over an Oakland office (better fits the Sacramento-area cluster of the rest of the list); `Lionakis` — actually an architecture firm, mapped to `civil_engineering` since the `company_category` enum has no architecture option.
+- Dave's account is now 31 companies total (6 distributor pre-existing + 22 civil_engineering + 3 landscape_architecture, all 25 new this session).
+
+## Status as of 2026-07-17 (session 10): Cross-rep visibility for design firms
+
+**Done — migration `0014_cross_rep_design_firm_visibility.sql` applied via the Supabase MCP:**
+- User's rationale for this feature, verbatim: "I think there is a benefit to seeing all of the locations for other reps. It may help them get in with a firm they're working on if they see we already did a lunch and learn at one or have contacts." Scoped strictly to `civil_engineering`/`landscape_architecture` — distributor/contractor data stays rep-exclusive by design, this isn't a general RLS loosening.
+- Two new read-only `SECURITY DEFINER` functions: `get_all_design_firms_across_reps()` (company-level rollup — offices/contacts/last-visit/L&L counts per company row, one row per rep's copy of a firm, NOT merged into a single card since there's no shared identity linking e.g. Albert's "Kimley-Horn" company row to Dave's) and `get_design_firm_locations_by_name(text)` (location-level detail — address, status, last visit, L&L, and a `jsonb` array of contacts per office — matched case/whitespace-insensitively by company name, since that's the only thing two reps' separate copies of the same real firm have in common). Applying the session-5 lesson learned early this time: explicitly `revoke execute ... from anon` in the same migration rather than waiting for `get_advisors` to flag it — confirmed clean, only the expected (intentional) `authenticated`-executable warnings showed up.
+- Verified end-to-end directly via SQL before wiring up the UI: Albert's "Kimley-Horn" (3 SoCal offices, 4 contacts) and Dave's separate "Kimley-Horn" (1 Sacramento office, 0 contacts) both surfaced correctly and merged correctly at the location level — exactly the scenario the feature is for.
+- `src/lib/reps.ts` gained `getRepLabel(email)` (friendly first-name label for cross-rep badges — "Albert"/"Dave", falls back to the email's local-part for untracked accounts).
+- New reusable `src/components/checkbox-filter.tsx` (`"use client"`) — a checkbox bound to a URL search param via `router.push`, preserving all other current params; used identically on both pages below rather than writing two one-off toggles.
+- `/firms`: new "Show all reps' firms" checkbox (`?allReps=1`). Off = today's behavior (`listCompanies`, RLS-scoped to you). On = `listAllDesignFirmsAcrossReps()`, still respecting the existing category/search filters (applied client-side in the page component, since the RPC itself takes no params — it's a small whole-table read). Each card gets a rep badge ("You" vs. the other rep's label).
+- `/companies/[id]`: new "Show other reps' offices" checkbox next to the Locations heading, design-firm companies only. Off = today's behavior. On = a new "Other Reps' Offices" section below the existing Locations grid, populated by `getDesignFirmLocationsAcrossReps(company.name, excludeRepId: <your id>)` — read-only cards (no edit path back into another rep's row; RLS would block that write anyway) showing each office's status, city, Lunch & Learn state, last visit, and full contact list.
+- New types in `src/lib/types.ts`: `DesignFirmAcrossReps`, `CrossRepContact`, `CrossRepLocation`. New query functions in `src/lib/queries/companies.ts`: `listAllDesignFirmsAcrossReps()`, `getDesignFirmLocationsAcrossReps(companyName, excludeRepId?)`.
+
+**Open:** the two judgment calls from session 9's Dave data upload (GEI Consultants office choice, Lionakis category) are still unconfirmed. Same "all my activities" export gap as prior sessions.
+
+## Status as of 2026-08-11 (session 11): Daily Activity Report
+
+**Done — no schema change, no migration needed:**
+- New "Daily Activity Report" card on `/reports`, same generate-button pattern as Design Firm Activity (`Button` rendering an `<a href="/api/reports/daily-activity">`). Per explicit user request (Dave needs to report to his manager daily): covers a rep's own visits/calls/emails and quotes/specs for a single day, always "today" — no watermark or "since last generated" logic like the Design Firm report, since there's nothing to dedupe against; it's just always safe to regenerate the same day. Deliberately excludes new-contacts-added (explicit user instruction), though a contact's name still shows on an activity line if the visit/call/email was logged against one.
+- New `src/lib/queries/daily-report.ts` (`getDailyReportData(date)`) — two RLS-scoped reads (`visit_notes` by `visit_date`, `opportunities` by `quote_date`), no category filtering (unlike the design-firm report, a manager wants the whole day across every account type — distributor, contractor, design firm).
+- New `src/app/api/reports/daily-activity/route.ts` — pdf-lib PDF, same cursor-based `Layout` approach as the Design Firm route but with an added `statTiles()` method: a row of 4 KPI boxes (Visits / Calls / Emails / Quotes+$) across the top of the page as the "visual" the user asked for (manager-hat call — the two existing PDF reports are both plain text/lists, this is the first one with an actual glanceable summary graphic), followed by itemized Activity and Quotes & Specs sections.
+
+**Open:** same as prior sessions — no downloadable "all my activities" export beyond this new daily one (this covers the day-level need; a longer-range export is still unbuilt), the two Dave-data-upload judgment calls (GEI Consultants office, Lionakis category) are still unconfirmed, Dave's Design Firm report still has no backlog floor.
+
 ## Google Maps scraping gotchas (if ever scraping a Maps list again)
 
 - Clicking a sidebar list item auto-scrolls the list, which invalidates previously-cached element refs/positions even though the ref ID looks still valid. Always re-`find` the target element by its unique name text immediately before each click — never reuse a ref captured before an intervening click.

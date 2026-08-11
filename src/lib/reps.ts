@@ -35,3 +35,19 @@ export const REP_REPORT_FLOOR: Record<string, string> = {
 export function getRepReportFloor(email: string | null | undefined): string | null {
   return (email ? REP_REPORT_FLOOR[email.toLowerCase()] : undefined) ?? null;
 }
+
+// Friendly first-name label for cross-rep views (e.g. "Albert has 3 offices here, Dave
+// has 1") -- showing a raw email in that context reads as a system log, not a colleague.
+// Anyone not listed (teammates just trying out the CRM) falls back to the part of their
+// email before the @.
+const REP_LABELS: Record<string, string> = {
+  "albertq31@gmail.com": "Albert",
+  "dland@eric-sons.com": "Dave",
+};
+
+export function getRepLabel(email: string | null | undefined): string {
+  if (!email) return "Unknown rep";
+  const fixed = REP_LABELS[email.toLowerCase()];
+  if (fixed) return fixed;
+  return email.split("@")[0];
+}

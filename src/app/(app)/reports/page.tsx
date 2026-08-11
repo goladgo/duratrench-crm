@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FileText, Mail, MapPin, Phone, Trophy } from "lucide-react";
+import { CalendarCheck, FileText, Mail, MapPin, Phone, Trophy } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getLastReportRunForRep } from "@/lib/queries/reports";
 import { getRepReportFloor, getRepTerritories } from "@/lib/reps";
@@ -50,6 +50,12 @@ export default async function ReportsPage() {
     getWeeklyQuotes(week),
     getWeeklyWonProjects(week),
   ]);
+
+  const todayLabel = new Date().toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
 
   const floor = getRepReportFloor(user?.email);
   const territoryLabel = getRepTerritories(user?.email, [])
@@ -110,6 +116,26 @@ export default async function ReportsPage() {
               })}
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="space-y-1.5">
+          <div className="flex items-center gap-2">
+            <CalendarCheck className="size-5 shrink-0 text-primary" />
+            <CardTitle className="text-base">Daily Activity Report</CardTitle>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            A one-page PDF of today&apos;s visits, calls, and emails, plus any quotes or specs
+            logged today — a quick visual to forward to your manager at the end of the day.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <p className="text-sm text-muted-foreground">Covers {todayLabel}. Safe to regenerate anytime today.</p>
+          <Button nativeButton={false} render={<a href="/api/reports/daily-activity" />}>
+            <CalendarCheck className="size-4" />
+            Generate Report (PDF)
+          </Button>
         </CardContent>
       </Card>
 
