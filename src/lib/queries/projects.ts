@@ -31,21 +31,27 @@ export async function listProjectsForDashboard(limit = 50): Promise<ProjectListI
   const projects = (projectRows ?? []) as unknown as Row[];
 
   const projectIds = projects.map((p) => p.id);
-  const countByProject = new Map<string, number>();
+  // Fetch full quote rows (not just a count) so the projects list can offer a
+  // "who won it" picker inline, without a per-row round trip to getProject().
+  const quotesByProject = new Map<string, ProjectQuote[]>();
   if (projectIds.length > 0) {
     const { data: oppRows, error: oppsError } = await supabase
       .from("opportunities")
-      .select("project_id")
-      .in("project_id", projectIds);
+      .select("*, contacts(id, name), locations(id, name, city, companies(id, name))")
+      .in("project_id", projectIds)
+      .order("amount", { ascending: false });
     if (oppsError) throw new Error(oppsError.message);
-    for (const o of (oppRows ?? []) as { project_id: string | null }[]) {
+    for (const o of (oppRows ?? []) as unknown as (ProjectQuote & { project_id: string | null })[]) {
       if (!o.project_id) continue;
-      countByProject.set(o.project_id, (countByProject.get(o.project_id) ?? 0) + 1);
+      const existing = quotesByProject.get(o.project_id) ?? [];
+      existing.push(o);
+      quotesByProject.set(o.project_id, existing);
     }
   }
 
   return projects.map((p) => {
     const company = Array.isArray(p.companies) ? (p.companies[0] ?? null) : p.companies;
+    const quotes = quotesByProject.get(p.id) ?? [];
     return {
       id: p.id,
       rep_id: p.rep_id,
@@ -57,7 +63,8 @@ export async function listProjectsForDashboard(limit = 50): Promise<ProjectListI
       won_at: p.won_at,
       created_at: p.created_at,
       specifying_company: company,
-      quote_count: countByProject.get(p.id) ?? 0,
+      quote_count: quotes.length,
+      quotes,
     };
   });
 }

@@ -4,6 +4,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProjectFormDialog } from "@/components/project-form-dialog";
+import { ProjectStageButton } from "@/components/project-stage-button";
+import { MarkProjectWonDialog } from "@/components/mark-project-won-dialog";
+import { markProjectLost } from "@/lib/actions/projects";
+import { XCircle } from "lucide-react";
 import {
   getContractorPerformance,
   getDistributorPerformance,
@@ -32,21 +36,32 @@ function formatMoney(value: number | null) {
 
 function ProjectRow({ project }: { project: ProjectListItem }) {
   return (
-    <Link
-      href={`/projects/${project.id}`}
-      className="flex items-center justify-between gap-3 px-3 py-3 text-sm transition-colors hover:bg-muted/50"
-    >
-      <div className="min-w-0">
+    <div className="flex items-center justify-between gap-3 px-3 py-3 text-sm transition-colors hover:bg-muted/50">
+      <Link href={`/projects/${project.id}`} className="min-w-0 flex-1">
         <p className="truncate font-medium">{project.name}</p>
         <p className="truncate text-xs text-muted-foreground">
           {project.specifying_company?.name ? `Spec'd by ${project.specifying_company.name} · ` : ""}
           {project.quote_count} quote{project.quote_count === 1 ? "" : "s"}
         </p>
+      </Link>
+      <div className="flex shrink-0 items-center gap-2">
+        {project.stage === "quoted" && (
+          <>
+            <MarkProjectWonDialog projectId={project.id} quotes={project.quotes} />
+            <ProjectStageButton
+              action={markProjectLost}
+              projectId={project.id}
+              label="Mark as Lost"
+              icon={<XCircle className="size-4" />}
+              confirmMessage={`Mark "${project.name}" as lost? This means none of your branches' quotes won the job.`}
+            />
+          </>
+        )}
+        <Badge variant={PROJECT_STAGE_VARIANT[project.stage]} className="shrink-0">
+          {project.stage}
+        </Badge>
       </div>
-      <Badge variant={PROJECT_STAGE_VARIANT[project.stage]} className="shrink-0">
-        {project.stage}
-      </Badge>
-    </Link>
+    </div>
   );
 }
 

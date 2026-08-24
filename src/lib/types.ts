@@ -96,6 +96,7 @@ export interface Project {
 export interface ProjectListItem extends Project {
   specifying_company: Pick<Company, "id" | "name"> | null;
   quote_count: number;
+  quotes: ProjectQuote[];
 }
 
 export interface ProjectQuote extends Opportunity {
