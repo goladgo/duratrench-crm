@@ -1,13 +1,14 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CalendarCheck, FileText, Mail, MapPin, Phone, Trophy } from "lucide-react";
+import { CalendarCheck, DollarSign, FileText, Mail, MapPin, Phone, Trophy } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getLastReportRunForRep } from "@/lib/queries/reports";
 import { getRepReportFloor, getRepTerritories } from "@/lib/reps";
 import { TERRITORY_LABELS } from "@/lib/territory";
-import { getWeeklyActivity, getWeeklyQuotes, getWeeklyWonProjects } from "@/lib/queries/weekly-report";
+import { getWeeklyActivityFeed, getWeeklyQuotes, getWeeklyWonProjects } from "@/lib/queries/weekly-report";
 import { addDays, formatISODate, formatShortLabel, mondayOf } from "@/lib/date-utils";
+import { ReportRangeToggle } from "@/components/report-range-toggle";
 import type { ActivityType, OpportunityStage } from "@/lib/types";
 
 function formatRunTimestamp(iso: string): string {
@@ -34,19 +35,33 @@ const STAGE_VARIANT: Record<OpportunityStage, "default" | "secondary" | "destruc
   lost: "destructive",
 };
 
-export default async function ReportsPage() {
+export default async function ReportsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ range?: string }>;
+}) {
+  const params = await searchParams;
+  const range = params.range === "2w" ? "2w" : "1w";
+  const periodLabel = range === "2w" ? "Last 2 Weeks" : "This Week";
+  const periodPhrase = range === "2w" ? "over the last 2 weeks" : "this week";
+
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const monday = mondayOf(new Date());
-  const week = { start: formatISODate(monday), end: formatISODate(addDays(monday, 6)) };
+  // Both options start from a Monday: "This Week" is Monday of the current week through
+  // Sunday; "Last 2 Weeks" is a fixed two-full-week block -- Monday of *last* week through
+  // Sunday of *this* week -- so the range is the same every time you run it, regardless of
+  // which day you happen to generate it on (handy for a biweekly Friday rundown).
+  const thisMonday = mondayOf(new Date());
+  const rangeStart = range === "2w" ? addDays(thisMonday, -7) : thisMonday;
+  const week = { start: formatISODate(rangeStart), end: formatISODate(addDays(thisMonday, 6)) };
   const weekLabel = `${formatShortLabel(week.start)} – ${formatShortLabel(week.end)}`;
 
-  const [lastRun, activity, quotes, wonProjects] = await Promise.all([
+  const [lastRun, feed, quotes, wonProjects] = await Promise.all([
     user ? getLastReportRunForRep(user.id) : Promise.resolve(null),
-    getWeeklyActivity(week),
+    getWeeklyActivityFeed(week),
     getWeeklyQuotes(week),
     getWeeklyWonProjects(week),
   ]);
@@ -71,45 +86,77 @@ export default async function ReportsPage() {
   const quoteTotal = quotes.reduce((sum, q) => sum + (q.amount ?? 0), 0);
   const wonTotal = wonProjects.reduce((sum, p) => sum + (p.amount ?? 0), 0);
 
+  const activityCountParts = [
+    feed.counts.visit ? `${feed.counts.visit} visit${feed.counts.visit === 1 ? "" : "s"}` : null,
+    feed.counts.call ? `${feed.counts.call} call${feed.counts.call === 1 ? "" : "s"}` : null,
+    feed.counts.email ? `${feed.counts.email} email${feed.counts.email === 1 ? "" : "s"}` : null,
+    feed.counts.opportunity ? `${feed.counts.opportunity} quote${feed.counts.opportunity === 1 ? "" : "s"}` : null,
+  ].filter((p): p is string => p != null);
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold">Reports</h1>
-        <p className="text-muted-foreground">
-          {territoryLabel ? `Your ${territoryLabel} territory. ` : ""}
-          Week of {weekLabel}.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold">Reports</h1>
+          <p className="text-muted-foreground">
+            {territoryLabel ? `Your ${territoryLabel} territory. ` : ""}
+            {range === "2w" ? "Two weeks" : "Week"} of {weekLabel}.
+          </p>
+        </div>
+        <ReportRangeToggle />
       </div>
 
       <Card>
         <CardHeader className="space-y-1.5">
-          <CardTitle className="text-base">This Week&apos;s Activities</CardTitle>
+          <CardTitle className="text-base">{periodLabel}&apos;s Activities</CardTitle>
           <p className="text-sm text-muted-foreground">
-            {activity.rows.length} logged this week — {activity.counts.visit} visit
-            {activity.counts.visit === 1 ? "" : "s"}, {activity.counts.call} call{activity.counts.call === 1 ? "" : "s"},{" "}
-            {activity.counts.email} email{activity.counts.email === 1 ? "" : "s"}.
+            {feed.items.length} logged {periodPhrase}
+            {activityCountParts.length > 0 ? ` — ${activityCountParts.join(", ")}.` : "."}
           </p>
         </CardHeader>
         <CardContent>
-          {activity.rows.length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nothing logged yet this week.</p>
+          {feed.items.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nothing logged yet {periodPhrase}.</p>
           ) : (
             <div className="max-h-[420px] space-y-3 overflow-y-auto">
-              {activity.rows.map((a) => {
-                const Icon = ACTIVITY_ICON[a.activityType];
+              {feed.items.map((item) => {
+                if (item.entryType === "opportunity") {
+                  const label = item.opportunityKind === "quote" ? "Quote" : "Spec";
+                  return (
+                    <div key={`opp-${item.id}`} className="flex gap-3 border-b pb-3 last:border-b-0 last:pb-0">
+                      <DollarSign className="mt-0.5 size-4 shrink-0 text-primary" />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-baseline justify-between gap-x-2">
+                          <p className="text-sm font-medium">
+                            {label} · {item.companyName}
+                            {item.locationName ? ` (${item.locationName})` : ""}
+                          </p>
+                          <p className="text-xs text-muted-foreground">{formatShortLabel(item.date)}</p>
+                        </div>
+                        {item.contactName && <p className="text-xs text-muted-foreground">{item.contactName}</p>}
+                        <p className="text-sm text-muted-foreground">
+                          {item.title}
+                          {item.amount != null ? ` — ${formatMoney(item.amount)}` : ""}
+                          {item.stage ? ` · ${item.stage}` : ""}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                }
+                const Icon = ACTIVITY_ICON[item.entryType];
                 return (
-                  <div key={a.id} className="flex gap-3 border-b pb-3 last:border-b-0 last:pb-0">
+                  <div key={`act-${item.id}`} className="flex gap-3 border-b pb-3 last:border-b-0 last:pb-0">
                     <Icon className="mt-0.5 size-4 shrink-0 text-primary" />
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-baseline justify-between gap-x-2">
                         <p className="text-sm font-medium">
-                          {ACTIVITY_LABEL[a.activityType]} · {a.companyName}
-                          {a.locationName ? ` (${a.locationName})` : ""}
+                          {ACTIVITY_LABEL[item.entryType]} · {item.companyName}
+                          {item.locationName ? ` (${item.locationName})` : ""}
                         </p>
-                        <p className="text-xs text-muted-foreground">{formatShortLabel(a.date)}</p>
+                        <p className="text-xs text-muted-foreground">{formatShortLabel(item.date)}</p>
                       </div>
-                      {a.contactName && <p className="text-xs text-muted-foreground">{a.contactName}</p>}
-                      <p className="text-sm text-muted-foreground">{a.notes}</p>
+                      {item.contactName && <p className="text-xs text-muted-foreground">{item.contactName}</p>}
+                      <p className="text-sm text-muted-foreground">{item.notes}</p>
                     </div>
                   </div>
                 );
@@ -141,14 +188,15 @@ export default async function ReportsPage() {
 
       <Card>
         <CardHeader className="space-y-1.5">
-          <CardTitle className="text-base">This Week&apos;s Quotes</CardTitle>
+          <CardTitle className="text-base">{periodLabel}&apos;s Quotes</CardTitle>
           <p className="text-sm text-muted-foreground">
-            {quotes.length} logged this week{quotes.length > 0 ? ` — ${formatMoney(quoteTotal)} total` : ""}.
+            {quotes.length} logged {periodPhrase}
+            {quotes.length > 0 ? ` — ${formatMoney(quoteTotal)} total` : ""}.
           </p>
         </CardHeader>
         <CardContent>
           {quotes.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No quotes or specs logged yet this week.</p>
+            <p className="text-sm text-muted-foreground">No quotes or specs logged yet {periodPhrase}.</p>
           ) : (
             <div className="max-h-[420px] space-y-3 overflow-y-auto">
               {quotes.map((q) => (
@@ -180,15 +228,18 @@ export default async function ReportsPage() {
         <CardHeader className="space-y-1.5">
           <div className="flex items-center gap-2">
             <Trophy className="size-4 shrink-0 text-primary" />
-            <CardTitle className="text-base">Projects Won This Week</CardTitle>
+            <CardTitle className="text-base">
+              {range === "2w" ? "Projects Won — Last 2 Weeks" : "Projects Won This Week"}
+            </CardTitle>
           </div>
           <p className="text-sm text-muted-foreground">
-            {wonProjects.length} won this week{wonProjects.length > 0 ? ` — ${formatMoney(wonTotal)} total` : ""}.
+            {wonProjects.length} won {periodPhrase}
+            {wonProjects.length > 0 ? ` — ${formatMoney(wonTotal)} total` : ""}.
           </p>
         </CardHeader>
         <CardContent>
           {wonProjects.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No projects marked won yet this week.</p>
+            <p className="text-sm text-muted-foreground">No projects marked won yet {periodPhrase}.</p>
           ) : (
             <div className="space-y-3">
               {wonProjects.map((p) => (
