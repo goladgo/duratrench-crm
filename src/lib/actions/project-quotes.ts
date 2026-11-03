@@ -8,6 +8,52 @@ import type { FormState } from "@/lib/actions/opportunities";
 
 const STAGES: OpportunityStage[] = ["quoted", "negotiating", "won", "lost"];
 
+type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
+
+// Finds or creates the person at a branch. A name that matches someone already there (ignoring
+// case and extra spaces) reuses them, filling in phone/email only where those were blank, so
+// typing "john smith" never makes a duplicate. Otherwise a new contact is created at the branch;
+// the first person added at a branch becomes its primary contact.
+async function resolveContact(
+  supabase: SupabaseClient,
+  repId: string,
+  locationId: string,
+  person: { name: string; phone: string | null; email: string | null }
+): Promise<{ contactId: string | null; created?: boolean; error?: string }> {
+  const { data: existing, error: contactsError } = await supabase
+    .from("contacts")
+    .select("id, name, phone, email")
+    .eq("location_id", locationId);
+  if (contactsError) return { contactId: null, error: contactsError.message };
+
+  const rows = (existing ?? []) as { id: string; name: string; phone: string | null; email: string | null }[];
+  const match = findContactByName(rows, person.name);
+  if (match) {
+    const patch: Record<string, string> = {};
+    if (person.phone && !match.phone) patch.phone = person.phone;
+    if (person.email && !match.email) patch.email = person.email;
+    if (Object.keys(patch).length > 0) {
+      await supabase.from("contacts").update(patch).eq("id", match.id);
+    }
+    return { contactId: match.id };
+  }
+
+  const { data: created, error: createError } = await supabase
+    .from("contacts")
+    .insert({
+      location_id: locationId,
+      name: person.name,
+      phone: person.phone,
+      email: person.email,
+      is_primary: rows.length === 0,
+      rep_id: repId,
+    })
+    .select("id")
+    .single();
+  if (createError) return { contactId: null, error: `Couldn't add ${person.name}: ${createError.message}` };
+  return { contactId: created.id, created: true };
+}
+
 // Called when a branch is picked in the Add Quote dialog, so the "person quoting" field can
 // suggest people already at that branch. Read-only; RLS limits it to the rep's own contacts.
 export async function getLocationContacts(locationId: string): Promise<ContactLite[]> {
@@ -62,40 +108,13 @@ export async function createQuoteForProject(_prev: FormState, formData: FormData
   // Resolve the person quoting: reuse an existing contact at this branch, or create one.
   let contactId: string | null = null;
   if (contactName) {
-    const { data: existing, error: contactsError } = await supabase
-      .from("contacts")
-      .select("id, name, phone, email")
-      .eq("location_id", locationId);
-    if (contactsError) return { error: contactsError.message };
-
-    const rows = (existing ?? []) as { id: string; name: string; phone: string | null; email: string | null }[];
-    const match = findContactByName(rows, contactName);
-    if (match) {
-      contactId = match.id;
-      // Fill in phone/email on the existing contact only if they were blank before.
-      const patch: Record<string, string> = {};
-      if (contactPhone && !match.phone) patch.phone = contactPhone;
-      if (contactEmail && !match.email) patch.email = contactEmail;
-      if (Object.keys(patch).length > 0) {
-        await supabase.from("contacts").update(patch).eq("id", match.id);
-      }
-    } else {
-      const { data: created, error: createError } = await supabase
-        .from("contacts")
-        .insert({
-          location_id: locationId,
-          name: contactName,
-          phone: contactPhone,
-          email: contactEmail,
-          // The first person added at a branch becomes its primary contact.
-          is_primary: rows.length === 0,
-          rep_id: user.id,
-        })
-        .select("id")
-        .single();
-      if (createError) return { error: `Couldn't add ${contactName}: ${createError.message}` };
-      contactId = created.id;
-    }
+    const resolved = await resolveContact(supabase, user.id, locationId, {
+      name: contactName,
+      phone: contactPhone,
+      email: contactEmail,
+    });
+    if (resolved.error) return { error: resolved.error };
+    contactId = resolved.contactId;
   }
 
   const { data: inserted, error: insertError } = await supabase
@@ -130,6 +149,51 @@ export async function createQuoteForProject(_prev: FormState, formData: FormData
   revalidatePath("/projects");
   revalidatePath(`/projects/${projectId}`);
   revalidatePath(`/locations/${locationId}`);
+  revalidatePath("/");
+  return { success: true };
+}
+
+// "Who quoted this?" on an existing quote. For the times a request comes in from someone who isn't
+// in the CRM yet and there was no time to add them first: quote it now, attach the person later.
+// Typing a new name creates them at the quote's own branch; an existing name is reused.
+export async function setQuoteContact(_prev: FormState, formData: FormData): Promise<FormState> {
+  const opportunityId = String(formData.get("opportunity_id") ?? "").trim();
+  const contactName = String(formData.get("contact_name") ?? "").trim();
+  const contactPhone = String(formData.get("contact_phone") ?? "").trim() || null;
+  const contactEmail = String(formData.get("contact_email") ?? "").trim() || null;
+
+  if (!opportunityId) return { error: "Missing quote." };
+  if (!contactName) return { error: "Type who quoted it." };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Not signed in." };
+
+  const { data: opp, error: oppError } = await supabase
+    .from("opportunities")
+    .select("id, location_id, project_id")
+    .eq("id", opportunityId)
+    .maybeSingle();
+  if (oppError || !opp) return { error: "Couldn't find that quote." };
+
+  const resolved = await resolveContact(supabase, user.id, opp.location_id, {
+    name: contactName,
+    phone: contactPhone,
+    email: contactEmail,
+  });
+  if (resolved.error || !resolved.contactId) return { error: resolved.error ?? "Couldn't save that person." };
+
+  const { error: updateError } = await supabase
+    .from("opportunities")
+    .update({ contact_id: resolved.contactId })
+    .eq("id", opportunityId);
+  if (updateError) return { error: updateError.message };
+
+  if (opp.project_id) revalidatePath(`/projects/${opp.project_id}`);
+  revalidatePath("/projects");
+  revalidatePath(`/locations/${opp.location_id}`);
   revalidatePath("/");
   return { success: true };
 }

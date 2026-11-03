@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { getProject, listDesignFirmCompaniesForPicker } from "@/lib/queries/projects";
 import { listQuoteContacts, listQuoteLocations } from "@/lib/queries/quote-locations";
 import { AddProjectQuoteDialog } from "@/components/add-project-quote-dialog";
+import { QuoteContactDialog } from "@/components/quote-contact-dialog";
 import { markProjectLost, reopenProject, deleteProject } from "@/lib/actions/projects";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -158,12 +159,20 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                     </span>
                     <span>{formatMoney(q.amount)}</span>
                   </div>
-                  {q.contacts?.name && (
-                    <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                      <User className="size-3.5 shrink-0" />
-                      {q.contacts.name}
-                    </p>
-                  )}
+                  <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                    {q.contacts?.name && (
+                      <>
+                        <User className="size-3.5 shrink-0" />
+                        {q.contacts.name}
+                      </>
+                    )}
+                    <QuoteContactDialog
+                      opportunityId={q.id}
+                      locationId={q.location_id}
+                      branchLabel={`${q.locations?.companies?.name ?? "Independent"}${q.locations?.name ? ` — ${q.locations.name}` : ""}`}
+                      currentName={q.contacts?.name ?? null}
+                    />
+                  </div>
                   {q.locations?.id && (
                     <Link href={`/locations/${q.locations.id}`} className="text-sm text-primary hover:underline">
                       View branch

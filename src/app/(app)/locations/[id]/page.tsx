@@ -11,6 +11,7 @@ import { ContactFormDialog } from "@/components/contact-form-dialog";
 import { ScanCardButton } from "@/components/scan-card-button";
 import { VisitNoteFormDialog } from "@/components/visit-note-form-dialog";
 import { OpportunityFormDialog } from "@/components/opportunity-form-dialog";
+import { QuoteContactDialog } from "@/components/quote-contact-dialog";
 import { DeleteButton } from "@/components/delete-button";
 import { LunchLearnCard } from "@/components/lunch-learn-card";
 import { LocationStatusSelect } from "@/components/location-status-select";
@@ -238,12 +239,20 @@ export default async function LocationProfilePage({ params }: { params: Promise<
                       <span>{o.product_line}</span>
                       <span>{formatMoney(o.amount)}</span>
                     </div>
-                    {contact && (
-                      <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                        <User className="size-3.5 shrink-0" />
-                        {contact.name}
-                      </p>
-                    )}
+                    <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                      {contact && (
+                        <>
+                          <User className="size-3.5 shrink-0" />
+                          {contact.name}
+                        </>
+                      )}
+                      <QuoteContactDialog
+                        opportunityId={o.id}
+                        locationId={location.id}
+                        branchLabel={location.name}
+                        currentName={contact?.name ?? null}
+                      />
+                    </div>
                     {o.project_id && (
                       <Link href={`/projects/${o.project_id}`} className="text-sm text-primary hover:underline">
                         View project
