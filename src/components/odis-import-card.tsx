@@ -23,6 +23,9 @@ const selectClass =
 // existing CRM project (similar name) defaults to Skip so it can't create a duplicate by accident.
 function defaultChoice(item: ImportItem): Choice {
   if (item.kind === "new") return item.candidates.length > 0 ? "skip" : "create";
+  // A project already in the CRM that has no price yet is pre-ticked so one paste fills it in.
+  // Rows that would also change the project's stage stay unticked so that is never a surprise.
+  if ((item.kind === "update" || item.kind === "link") && item.fillsMissingPrice && !item.newStage) return "apply";
   return "skip";
 }
 
@@ -113,8 +116,54 @@ export function OdisImportCard() {
   const unchangedCount = items?.filter((i) => i.kind === "unchanged").length ?? 0;
   const newRows = items?.filter((i) => i.kind === "new" || i.kind === "ambiguous") ?? [];
   const existingRows = items?.filter((i) => i.kind === "update" || i.kind === "link") ?? [];
+  const needPriceRows = existingRows.filter((i) => i.fillsMissingPrice);
+  const otherExisting = existingRows.filter((i) => !i.fillsMissingPrice);
   const newItems = newRows.filter((i) => i.kind === "new");
   const willAddCount = newRows.filter((i) => choices[i.odis.odisId] === "create").length;
+
+  // One "already in the CRM" row with its Update checkbox. Used by both existing-project sections.
+  const existingRow = (item: ImportItem) => {
+    const id = item.odis.odisId;
+    const included = choices[id] === "apply";
+    return (
+                      <li key={id} className="space-y-1 p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="font-medium">{item.odis.name}</span>
+                              <Badge variant="outline">In CRM</Badge>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              ODIS #{id} · {item.odis.status ?? "no status"} · {formatMoney(item.odis.price)}
+                              {item.project && item.project.name !== item.odis.name ? ` · CRM: ${item.project.name}` : ""}
+                            </p>
+                          </div>
+                          <label className="flex items-center gap-2 text-sm">
+                            <input
+                              type="checkbox"
+                              checked={included}
+                              onChange={(e) =>
+                                setChoices((c) => ({ ...c, [id]: e.target.checked ? "apply" : "skip" }))
+                              }
+                            />
+                            Update from ODIS
+                          </label>
+                        </div>
+                        {included && item.changes.length > 0 && (
+                          <ul className="list-disc space-y-0.5 pl-5 text-xs text-muted-foreground">
+                            {item.changes.map((c, i) => (
+                              <li key={i}>{c}</li>
+                            ))}
+                          </ul>
+                        )}
+                        {item.flags.map((f, i) => (
+                          <p key={i} className="text-xs font-medium text-amber-700 dark:text-amber-400">
+                            {f}
+                          </p>
+                        ))}
+                      </li>
+    );
+  };
 
   return (
     <section className="w-full space-y-4 rounded-xl border bg-card p-4 text-card-foreground">
@@ -253,10 +302,21 @@ export function OdisImportCard() {
             )}
           </div>
 
-          {existingRows.length > 0 && (
+          {needPriceRows.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="font-medium">In the CRM but missing a price ({needPriceRows.length})</h3>
+              <p className="text-xs text-muted-foreground">
+                These are ticked so the ODIS price, status and follow-up date get filled in. Untick any you want left
+                alone.
+              </p>
+              <ul className="divide-y rounded-lg border">{needPriceRows.map(existingRow)}</ul>
+            </div>
+          )}
+
+          {otherExisting.length > 0 && (
             <details className="rounded-lg border">
               <summary className="cursor-pointer select-none p-3 text-sm font-medium">
-                Already in the CRM ({existingRows.length}). Left alone unless you tick them
+                Already in the CRM with a price ({otherExisting.length}). Left alone unless you tick them
               </summary>
               <div className="space-y-2 border-t p-3">
                 <div className="flex gap-2">
@@ -266,7 +326,7 @@ export function OdisImportCard() {
                     onClick={() =>
                       setChoices((c) => ({
                         ...c,
-                        ...Object.fromEntries(existingRows.map((i) => [i.odis.odisId, "apply"])),
+                        ...Object.fromEntries(otherExisting.map((i) => [i.odis.odisId, "apply"])),
                       }))
                     }
                   >
@@ -278,7 +338,7 @@ export function OdisImportCard() {
                     onClick={() =>
                       setChoices((c) => ({
                         ...c,
-                        ...Object.fromEntries(existingRows.map((i) => [i.odis.odisId, "skip"])),
+                        ...Object.fromEntries(otherExisting.map((i) => [i.odis.odisId, "skip"])),
                       }))
                     }
                   >
@@ -286,48 +346,7 @@ export function OdisImportCard() {
                   </Button>
                 </div>
                 <ul className="divide-y rounded-lg border">
-                  {existingRows.map((item) => {
-                    const id = item.odis.odisId;
-                    const included = choices[id] === "apply";
-                    return (
-                      <li key={id} className="space-y-1 p-3">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="font-medium">{item.odis.name}</span>
-                              <Badge variant="outline">In CRM</Badge>
-                            </div>
-                            <p className="text-xs text-muted-foreground">
-                              ODIS #{id} · {item.odis.status ?? "no status"} · {formatMoney(item.odis.price)}
-                              {item.project && item.project.name !== item.odis.name ? ` · CRM: ${item.project.name}` : ""}
-                            </p>
-                          </div>
-                          <label className="flex items-center gap-2 text-sm">
-                            <input
-                              type="checkbox"
-                              checked={included}
-                              onChange={(e) =>
-                                setChoices((c) => ({ ...c, [id]: e.target.checked ? "apply" : "skip" }))
-                              }
-                            />
-                            Update from ODIS
-                          </label>
-                        </div>
-                        {included && item.changes.length > 0 && (
-                          <ul className="list-disc space-y-0.5 pl-5 text-xs text-muted-foreground">
-                            {item.changes.map((c, i) => (
-                              <li key={i}>{c}</li>
-                            ))}
-                          </ul>
-                        )}
-                        {item.flags.map((f, i) => (
-                          <p key={i} className="text-xs font-medium text-amber-700 dark:text-amber-400">
-                            {f}
-                          </p>
-                        ))}
-                      </li>
-                    );
-                  })}
+                  {otherExisting.map(existingRow)}
                 </ul>
               </div>
             </details>

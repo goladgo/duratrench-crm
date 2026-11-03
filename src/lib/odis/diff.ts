@@ -35,6 +35,8 @@ export interface ImportItem {
   flags: string[];
   // The stage this row would move the project to (null = leave as-is).
   newStage: CrmStage | null;
+  // True when the CRM project has no ODIS price yet and this row would supply one.
+  fillsMissingPrice: boolean;
 }
 
 export function normalizeName(s: string): string {
@@ -140,6 +142,7 @@ export function diffOdisRows(rows: OdisRow[], existing: ExistingProject[]): Impo
       changes: newStage ? [...changes, `Stage ${p.stage} → ${newStage}`] : changes,
       flags,
       newStage,
+      fillsMissingPrice: p.odis_price == null && row.price != null,
     });
   }
 
@@ -161,6 +164,7 @@ export function diffOdisRows(rows: OdisRow[], existing: ExistingProject[]): Impo
         changes: [`Link to ODIS #${row.odisId}`, ...describeChanges(row, p), ...(newStage ? [`Stage ${p.stage} → ${newStage}`] : [])],
         flags,
         newStage,
+        fillsMissingPrice: p.odis_price == null && row.price != null,
       });
       continue;
     }
@@ -174,6 +178,7 @@ export function diffOdisRows(rows: OdisRow[], existing: ExistingProject[]): Impo
         changes: [],
         flags: ["More than one CRM project has this name. Pick which one it is."],
         newStage: null,
+        fillsMissingPrice: false,
       });
       continue;
     }
@@ -187,6 +192,7 @@ export function diffOdisRows(rows: OdisRow[], existing: ExistingProject[]): Impo
       changes: [],
       flags: flags.filter((f) => f.startsWith("Sold in ODIS")),
       newStage: null,
+      fillsMissingPrice: false,
     });
   }
 
