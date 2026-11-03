@@ -19,7 +19,8 @@ import { PlusCircle } from "lucide-react";
 import { createQuoteForProject, getLocationContacts } from "@/lib/actions/project-quotes";
 import type { FormState } from "@/lib/actions/opportunities";
 import { findContactByName, suggestContacts, type ContactLite } from "@/lib/quotes/contact-match";
-import type { QuoteLocation } from "@/lib/queries/quote-locations";
+import { normalizePersonName } from "@/lib/quotes/contact-match";
+import type { QuoteContact, QuoteLocation } from "@/lib/queries/quote-locations";
 
 const initialState: FormState = {};
 
@@ -32,9 +33,14 @@ function branchLabel(l: QuoteLocation): string {
 export function AddProjectQuoteDialog({
   project,
   locations,
+  contacts: allContacts,
+  defaultAmount = null,
 }: {
   project: { id: string; name: string };
   locations: QuoteLocation[];
+  contacts: QuoteContact[];
+  // Prefills the amount (the ODIS price) so it doesn't have to be typed again.
+  defaultAmount?: number | null;
 }) {
   const [open, setOpen] = useState(false);
   const [branch, setBranch] = useState<QuoteLocation | null>(null);
@@ -59,9 +65,10 @@ export function AddProjectQuoteDialog({
     return result;
   }, initialState);
 
-  function chooseBranch(l: QuoteLocation) {
+  function chooseBranch(l: QuoteLocation, presetPerson = "") {
     setBranch(l);
-    setPersonName("");
+    setBranchQuery("");
+    setPersonName(presetPerson);
     setContacts([]);
     startLoadContacts(async () => {
       setContacts(await getLocationContacts(l.id));
@@ -75,6 +82,16 @@ export function AddProjectQuoteDialog({
       .filter((l) => `${l.companyName ?? ""} ${l.name} ${l.city ?? ""}`.toLowerCase().includes(q))
       .slice(0, 6);
   }, [branchQuery, locations]);
+
+  // People who already exist, searchable across every branch. Picking one fills in their branch.
+  const locationsById = useMemo(() => new Map(locations.map((l) => [l.id, l])), [locations]);
+  const peopleMatches = useMemo(() => {
+    const q = normalizePersonName(branchQuery);
+    if (q.length < 2) return [];
+    return allContacts
+      .filter((c) => locationsById.has(c.locationId) && normalizePersonName(c.name).includes(q))
+      .slice(0, 6);
+  }, [branchQuery, allContacts, locationsById]);
 
   const matchedContact = findContactByName(contacts, personName);
   const isNewPerson = personName.trim() !== "" && !matchedContact && branch !== null;
@@ -95,7 +112,7 @@ export function AddProjectQuoteDialog({
           <input type="hidden" name="location_id" value={branch?.id ?? ""} />
 
           <div className="space-y-2">
-            <Label htmlFor="quote-branch">Distributor branch</Label>
+            <Label htmlFor="quote-branch">Who quoted it? Search a person or a branch</Label>
             {branch ? (
               <div className="flex items-center justify-between gap-2 rounded-md border px-3 py-2">
                 <span className="text-sm font-medium">{branchLabel(branch)}</span>
@@ -109,11 +126,26 @@ export function AddProjectQuoteDialog({
                   id="quote-branch"
                   value={branchQuery}
                   onChange={(e: { target: { value: string } }) => setBranchQuery(e.target.value)}
-                  placeholder="Start typing: Ferguson, Core & Main, Torrance…"
+                  placeholder="John Smith, Ferguson, Core & Main Torrance…"
                   autoComplete="off"
                 />
-                {branchMatches.length > 0 && (
+                {(peopleMatches.length > 0 || branchMatches.length > 0) && (
                   <ul className="divide-y rounded-md border">
+                    {peopleMatches.map((c) => {
+                      const l = locationsById.get(c.locationId)!;
+                      return (
+                        <li key={c.id}>
+                          <button
+                            type="button"
+                            className="w-full px-3 py-2 text-left text-sm hover:bg-muted"
+                            onClick={() => chooseBranch(l, c.name)}
+                          >
+                            <span className="font-medium">{c.name}</span>
+                            <span className="text-muted-foreground"> · {branchLabel(l)}</span>
+                          </button>
+                        </li>
+                      );
+                    })}
                     {branchMatches.map((l) => (
                       <li key={l.id}>
                         <button
@@ -122,14 +154,16 @@ export function AddProjectQuoteDialog({
                           onClick={() => chooseBranch(l)}
                         >
                           {branchLabel(l)}
+                          <span className="text-muted-foreground"> · branch</span>
                         </button>
                       </li>
                     ))}
                   </ul>
                 )}
-                {branchQuery.trim() !== "" && branchMatches.length === 0 && (
+                {branchQuery.trim() !== "" && peopleMatches.length === 0 && branchMatches.length === 0 && (
                   <p className="text-xs text-muted-foreground">
-                    No branch found. Add it from the Distributors tab first, then come back.
+                    No person or branch found. For a brand-new person, search for their branch and type their name
+                    next. If the branch isn&apos;t in the CRM, add it from the Distributors tab first.
                   </p>
                 )}
               </>
@@ -182,7 +216,7 @@ export function AddProjectQuoteDialog({
             </div>
             <div className="space-y-2">
               <Label htmlFor="quote-amount">Amount ($)</Label>
-              <Input id="quote-amount" name="amount" type="number" step="0.01" min="0" />
+              <Input id="quote-amount" name="amount" type="number" step="0.01" min="0" defaultValue={defaultAmount ?? undefined} />
             </div>
           </div>
 

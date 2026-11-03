@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getProject, listDesignFirmCompaniesForPicker } from "@/lib/queries/projects";
-import { listQuoteLocations } from "@/lib/queries/quote-locations";
+import { listQuoteContacts, listQuoteLocations } from "@/lib/queries/quote-locations";
 import { AddProjectQuoteDialog } from "@/components/add-project-quote-dialog";
 import { markProjectLost, reopenProject, deleteProject } from "@/lib/actions/projects";
 import { Badge } from "@/components/ui/badge";
@@ -27,10 +27,11 @@ function formatMoney(value: number | null) {
 export default async function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
-  const [project, designFirms, quoteLocations] = await Promise.all([
+  const [project, designFirms, quoteLocations, quoteContacts] = await Promise.all([
     getProject(id),
     listDesignFirmCompaniesForPicker(),
     listQuoteLocations(),
+    listQuoteContacts(),
   ]);
   if (!project) notFound();
 
@@ -42,6 +43,14 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
         <div className="space-y-2">
           <Badge variant={STAGE_VARIANT[project.stage]}>{project.stage}</Badge>
           <h1 className="text-2xl font-semibold">{project.name}</h1>
+          {project.odis_id && (
+            <p className="text-sm text-muted-foreground">
+              ODIS #{project.odis_id}
+              {project.odis_status ? ` · ${project.odis_status}` : ""}
+              {project.odis_price != null ? ` · ${formatMoney(project.odis_price)}` : ""}
+              {project.odis_follow_up_date ? ` · Follow up ${project.odis_follow_up_date}` : ""}
+            </p>
+          )}
           {project.specifying_company && (
             <Link
               href={`/companies/${project.specifying_company.id}`}
@@ -111,7 +120,12 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
         <div className="flex items-center justify-between gap-2">
           <h2 className="text-lg font-medium">Quotes ({project.quotes.length})</h2>
           {project.stage === "quoted" && (
-            <AddProjectQuoteDialog project={{ id: project.id, name: project.name }} locations={quoteLocations} />
+            <AddProjectQuoteDialog
+              project={{ id: project.id, name: project.name }}
+              locations={quoteLocations}
+              contacts={quoteContacts}
+              defaultAmount={project.odis_price}
+            />
           )}
         </div>
         {project.quotes.length === 0 ? (

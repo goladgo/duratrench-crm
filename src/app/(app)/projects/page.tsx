@@ -16,7 +16,12 @@ import {
   getDistributorRepPerformance,
   listProjectsForDashboard,
 } from "@/lib/queries/projects";
-import { listQuoteLocations, type QuoteLocation } from "@/lib/queries/quote-locations";
+import {
+  listQuoteContacts,
+  listQuoteLocations,
+  type QuoteContact,
+  type QuoteLocation,
+} from "@/lib/queries/quote-locations";
 import type { ProjectListItem, ProjectStage } from "@/lib/types";
 
 const PROJECT_STAGE_VARIANT: Record<ProjectStage, "default" | "secondary" | "destructive"> = {
@@ -37,20 +42,34 @@ function formatMoney(value: number | null) {
   return value.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 }
 
-function ProjectRow({ project, locations }: { project: ProjectListItem; locations: QuoteLocation[] }) {
+function ProjectRow({
+  project,
+  locations,
+  contacts,
+}: {
+  project: ProjectListItem;
+  locations: QuoteLocation[];
+  contacts: QuoteContact[];
+}) {
   return (
     <div className="flex items-center justify-between gap-3 px-3 py-3 text-sm transition-colors hover:bg-muted/50">
       <Link href={`/projects/${project.id}`} className="min-w-0 flex-1">
         <p className="truncate font-medium">{project.name}</p>
         <p className="truncate text-xs text-muted-foreground">
           {project.specifying_company?.name ? `Spec'd by ${project.specifying_company.name} · ` : ""}
+          {project.odis_price != null ? `${formatMoney(project.odis_price)} · ` : ""}
           {project.quote_count} quote{project.quote_count === 1 ? "" : "s"}
         </p>
       </Link>
       <div className="flex shrink-0 items-center gap-2">
         {project.stage === "quoted" && (
           <>
-            <AddProjectQuoteDialog project={{ id: project.id, name: project.name }} locations={locations} />
+            <AddProjectQuoteDialog
+              project={{ id: project.id, name: project.name }}
+              locations={locations}
+              contacts={contacts}
+              defaultAmount={project.odis_price}
+            />
             <MarkProjectWonDialog projectId={project.id} quotes={project.quotes} />
             <ProjectStageButton
               action={markProjectLost}
@@ -70,12 +89,14 @@ function ProjectRow({ project, locations }: { project: ProjectListItem; location
 }
 
 export default async function ProjectsPage() {
-  const [projects, distributorPerformance, distributorRepPerformance, contractorPerformance, quoteLocations] = await Promise.all([
+  const [projects, distributorPerformance, distributorRepPerformance, contractorPerformance, quoteLocations, quoteContacts] =
+    await Promise.all([
     listProjectsForDashboard(200),
     getDistributorPerformance(),
     getDistributorRepPerformance(),
     getContractorPerformance(),
     listQuoteLocations(),
+    listQuoteContacts(),
   ]);
 
   return (
@@ -110,7 +131,7 @@ export default async function ProjectsPage() {
               ) : (
                 <div className="max-h-[560px] divide-y overflow-y-auto rounded-lg border">
                   {filtered.map((p) => (
-                    <ProjectRow key={p.id} project={p} locations={quoteLocations} />
+                    <ProjectRow key={p.id} project={p} locations={quoteLocations} contacts={quoteContacts} />
                   ))}
                 </div>
               )}

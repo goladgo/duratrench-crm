@@ -42,3 +42,22 @@ export async function listQuoteLocations(): Promise<QuoteLocation[]> {
       companyName: company?.name ?? null,
     }));
 }
+
+export interface QuoteContact {
+  id: string;
+  name: string;
+  locationId: string;
+}
+
+// Every contact the rep has, so the Add Quote picker can search people directly: choosing a
+// person also chooses their branch. The dialog drops anyone whose branch isn't quote-capable.
+export async function listQuoteContacts(): Promise<QuoteContact[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("contacts").select("id, name, location_id").order("name");
+  if (error) throw new Error(error.message);
+  return ((data ?? []) as { id: string; name: string; location_id: string }[]).map((c) => ({
+    id: c.id,
+    name: c.name,
+    locationId: c.location_id,
+  }));
+}

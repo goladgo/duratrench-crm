@@ -20,7 +20,7 @@ export async function listProjectsForDashboard(limit = 50): Promise<ProjectListI
   const { data: projectRows, error: projectsError } = await supabase
     .from("projects")
     .select(
-      "id, rep_id, name, notes, stage, specifying_company_id, winning_opportunity_id, won_at, created_at, companies(id, name)"
+      "id, rep_id, name, notes, stage, specifying_company_id, winning_opportunity_id, won_at, odis_id, odis_status, odis_price, odis_follow_up_date, created_at, companies(id, name)"
     )
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -61,6 +61,10 @@ export async function listProjectsForDashboard(limit = 50): Promise<ProjectListI
       specifying_company_id: p.specifying_company_id,
       winning_opportunity_id: p.winning_opportunity_id,
       won_at: p.won_at,
+      odis_id: p.odis_id,
+      odis_status: p.odis_status,
+      odis_price: p.odis_price == null ? null : Number(p.odis_price),
+      odis_follow_up_date: p.odis_follow_up_date,
       created_at: p.created_at,
       specifying_company: company,
       quote_count: quotes.length,
@@ -75,7 +79,7 @@ export async function getProject(id: string): Promise<ProjectDetail | null> {
   const { data: projectRow, error: projectError } = await supabase
     .from("projects")
     .select(
-      "id, rep_id, name, notes, stage, specifying_company_id, winning_opportunity_id, won_at, created_at, companies(id, name, category)"
+      "id, rep_id, name, notes, stage, specifying_company_id, winning_opportunity_id, won_at, odis_id, odis_status, odis_price, odis_follow_up_date, created_at, companies(id, name, category)"
     )
     .eq("id", id)
     .maybeSingle();
@@ -104,6 +108,10 @@ export async function getProject(id: string): Promise<ProjectDetail | null> {
     specifying_company_id: p.specifying_company_id,
     winning_opportunity_id: p.winning_opportunity_id,
     won_at: p.won_at,
+    odis_id: p.odis_id,
+    odis_status: p.odis_status,
+    odis_price: p.odis_price == null ? null : Number(p.odis_price),
+    odis_follow_up_date: p.odis_follow_up_date,
     created_at: p.created_at,
     specifying_company: company as Pick<Company, "id" | "name" | "category"> | null,
     quotes: (quoteRows ?? []) as unknown as ProjectQuote[],
