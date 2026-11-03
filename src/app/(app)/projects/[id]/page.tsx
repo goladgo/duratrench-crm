@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getProject, listDesignFirmCompaniesForPicker } from "@/lib/queries/projects";
+import { listQuoteLocations } from "@/lib/queries/quote-locations";
+import { AddProjectQuoteDialog } from "@/components/add-project-quote-dialog";
 import { markProjectLost, reopenProject, deleteProject } from "@/lib/actions/projects";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -25,7 +27,11 @@ function formatMoney(value: number | null) {
 export default async function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
-  const [project, designFirms] = await Promise.all([getProject(id), listDesignFirmCompaniesForPicker()]);
+  const [project, designFirms, quoteLocations] = await Promise.all([
+    getProject(id),
+    listDesignFirmCompaniesForPicker(),
+    listQuoteLocations(),
+  ]);
   if (!project) notFound();
 
   const winningQuote = project.quotes.find((q) => q.id === project.winning_opportunity_id);
@@ -102,10 +108,15 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
       </Card>
 
       <div className="space-y-3">
-        <h2 className="text-lg font-medium">Quotes ({project.quotes.length})</h2>
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-lg font-medium">Quotes ({project.quotes.length})</h2>
+          {project.stage === "quoted" && (
+            <AddProjectQuoteDialog project={{ id: project.id, name: project.name }} locations={quoteLocations} />
+          )}
+        </div>
         {project.quotes.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No quotes yet — log one from a branch's Quotes tab and pick this project.
+            No quotes yet. Use Add quote to log who quoted it.
           </p>
         ) : (
           <div className="space-y-3">

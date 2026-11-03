@@ -6,6 +6,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ProjectFormDialog } from "@/components/project-form-dialog";
 import { ProjectStageButton } from "@/components/project-stage-button";
 import { MarkProjectWonDialog } from "@/components/mark-project-won-dialog";
+import { AddProjectQuoteDialog } from "@/components/add-project-quote-dialog";
+import { OdisImportCard } from "@/components/odis-import-card";
 import { markProjectLost } from "@/lib/actions/projects";
 import { XCircle } from "lucide-react";
 import {
@@ -14,6 +16,7 @@ import {
   getDistributorRepPerformance,
   listProjectsForDashboard,
 } from "@/lib/queries/projects";
+import { listQuoteLocations, type QuoteLocation } from "@/lib/queries/quote-locations";
 import type { ProjectListItem, ProjectStage } from "@/lib/types";
 
 const PROJECT_STAGE_VARIANT: Record<ProjectStage, "default" | "secondary" | "destructive"> = {
@@ -34,7 +37,7 @@ function formatMoney(value: number | null) {
   return value.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 }
 
-function ProjectRow({ project }: { project: ProjectListItem }) {
+function ProjectRow({ project, locations }: { project: ProjectListItem; locations: QuoteLocation[] }) {
   return (
     <div className="flex items-center justify-between gap-3 px-3 py-3 text-sm transition-colors hover:bg-muted/50">
       <Link href={`/projects/${project.id}`} className="min-w-0 flex-1">
@@ -47,6 +50,7 @@ function ProjectRow({ project }: { project: ProjectListItem }) {
       <div className="flex shrink-0 items-center gap-2">
         {project.stage === "quoted" && (
           <>
+            <AddProjectQuoteDialog project={{ id: project.id, name: project.name }} locations={locations} />
             <MarkProjectWonDialog projectId={project.id} quotes={project.quotes} />
             <ProjectStageButton
               action={markProjectLost}
@@ -66,11 +70,12 @@ function ProjectRow({ project }: { project: ProjectListItem }) {
 }
 
 export default async function ProjectsPage() {
-  const [projects, distributorPerformance, distributorRepPerformance, contractorPerformance] = await Promise.all([
+  const [projects, distributorPerformance, distributorRepPerformance, contractorPerformance, quoteLocations] = await Promise.all([
     listProjectsForDashboard(200),
     getDistributorPerformance(),
     getDistributorRepPerformance(),
     getContractorPerformance(),
+    listQuoteLocations(),
   ]);
 
   return (
@@ -82,6 +87,8 @@ export default async function ProjectsPage() {
         </div>
         <ProjectFormDialog />
       </div>
+
+      <OdisImportCard />
 
       <Tabs defaultValue="all">
         <TabsList>
@@ -103,7 +110,7 @@ export default async function ProjectsPage() {
               ) : (
                 <div className="max-h-[560px] divide-y overflow-y-auto rounded-lg border">
                   {filtered.map((p) => (
-                    <ProjectRow key={p.id} project={p} />
+                    <ProjectRow key={p.id} project={p} locations={quoteLocations} />
                   ))}
                 </div>
               )}
