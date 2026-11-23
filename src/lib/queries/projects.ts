@@ -204,6 +204,73 @@ export async function listWonProjects(): Promise<WonProjectSummary[]> {
   });
 }
 
+export interface MonthlySales {
+  month: number; // 1-12
+  total: number; // sum of winning-quote amounts, USD
+  orders: number; // number of won projects
+}
+
+// Month of a timestamp as seen on the West Coast, where both reps work -- a project won
+// at 6pm Pacific on the 31st is already "tomorrow" in UTC and would land in the wrong month.
+function pacificYearMonth(iso: string): { year: number; month: number } | null {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  const parts = new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", year: "numeric", month: "numeric" })
+    .formatToParts(d);
+  const year = Number(parts.find((p) => p.type === "year")?.value);
+  const month = Number(parts.find((p) => p.type === "month")?.value);
+  return year && month ? { year, month } : null;
+}
+
+// Sales by month for one calendar year, from WON projects: $ is the winning quote's
+// amount (the sold price -- not the project's ODIS estimate) and an "order" is one won
+// project. A project is dated by `won_at`; projects won before that column existed have
+// no `won_at`, so they fall back to the winning quote's date, then the project's creation.
+export async function getMonthlySales(year: number): Promise<MonthlySales[]> {
+  const supabase = await createClient();
+
+  const { data: projectRows, error: projectsError } = await supabase
+    .from("projects")
+    .select("id, created_at, won_at, winning_opportunity_id")
+    .eq("stage", "won");
+  if (projectsError) throw new Error(projectsError.message);
+
+  const projects = (projectRows ?? []) as Pick<Project, "id" | "created_at" | "won_at" | "winning_opportunity_id">[];
+  const oppIds = projects.map((p) => p.winning_opportunity_id).filter((id): id is string => !!id);
+
+  const oppById = new Map<string, { amount: number | null; quote_date: string | null }>();
+  if (oppIds.length > 0) {
+    const { data: oppRows, error: oppsError } = await supabase
+      .from("opportunities")
+      .select("id, amount, quote_date")
+      .in("id", oppIds);
+    if (oppsError) throw new Error(oppsError.message);
+    for (const o of (oppRows ?? []) as { id: string; amount: number | null; quote_date: string | null }[]) {
+      oppById.set(o.id, { amount: o.amount, quote_date: o.quote_date });
+    }
+  }
+
+  const months: MonthlySales[] = Array.from({ length: 12 }, (_, i) => ({ month: i + 1, total: 0, orders: 0 }));
+  for (const p of projects) {
+    const opp = p.winning_opportunity_id ? oppById.get(p.winning_opportunity_id) : undefined;
+    let ym: { year: number; month: number } | null = null;
+    if (p.won_at) {
+      ym = pacificYearMonth(p.won_at);
+    } else if (opp?.quote_date) {
+      // quote_date is a plain date (YYYY-MM-DD): read it as-is, no timezone shift.
+      const [y, m] = opp.quote_date.split("-").map(Number);
+      ym = y && m ? { year: y, month: m } : null;
+    } else {
+      ym = pacificYearMonth(p.created_at);
+    }
+    if (!ym || ym.year !== year) continue;
+    const bucket = months[ym.month - 1];
+    bucket.total += opp?.amount ?? 0;
+    bucket.orders += 1;
+  }
+  return months;
+}
+
 // Shared scoreboard builder: how many quotes companies of a given category have
 // submitted, how many project competitions they've won, and the total $ of those
 // wins. `keep` decides which zero-activity rows to drop — distributors show up as
