@@ -3,6 +3,7 @@ import type {
   CompanyCategory,
   CompanyRollup,
   Company,
+  Contact,
   Location,
   DesignFirmAcrossReps,
   CrossRepContact,
@@ -256,4 +257,176 @@ export async function getDesignFirmLocationsAcrossReps(
     contacts: r.contacts ?? [],
   }));
   return excludeRepId ? rows.filter((r) => r.repId !== excludeRepId) : rows;
+}
+
+
+// ---------------------------------------------------------------------------
+// Contacts directory -- backs the combined /contacts tab (design firms + contractors).
+//
+// Search is deliberately broader than a name filter: a rep looking for "who was that
+// guy at Kimley in Irvine" should be able to type "kimley irvine" or "mike" and land on
+// the right firm. So every firm is matched against a haystack of its own name PLUS all
+// of its branches (name, city, address, zip) PLUS all of its people (name, title, email,
+// phone). Every whitespace-separated word must appear somewhere in that haystack (AND
+// semantics), which is what makes "kimley irvine" work even though the two words live on
+// different rows. Everything is RLS-scoped to the signed-in rep.
+// ---------------------------------------------------------------------------
+export const DIRECTORY_CATEGORIES: CompanyCategory[] = [
+  "civil_engineering",
+  "landscape_architecture",
+  "contractor",
+];
+
+export type DirectoryContact = Pick<Contact, "id" | "location_id" | "name" | "title" | "phone" | "email">;
+
+export interface DirectoryEntry {
+  company: Company;
+  rollup: CompanyRollup | undefined;
+  lunchLearn: CompanyLunchLearn;
+  // Branches / people that matched the search words (empty when there's no search, or
+  // when the firm only matched on its own name).
+  matchedLocations: Location[];
+  matchedContacts: (DirectoryContact & { locationLabel: string })[];
+}
+
+function norm(v: string | null | undefined) {
+  return (v ?? "").toLowerCase();
+}
+
+// PostgREST caps a single response at 1000 rows by default -- page through so a large
+// directory (hundreds of branches, many contacts) never silently truncates.
+async function fetchAll<T>(
+  build: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>
+): Promise<T[]> {
+  const pageSize = 1000;
+  const out: T[] = [];
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await build(from, from + pageSize - 1);
+    if (error) throw new Error(error.message);
+    out.push(...(data ?? []));
+    if (!data || data.length < pageSize) break;
+  }
+  return out;
+}
+
+export async function listContactsDirectory(search?: string): Promise<DirectoryEntry[]> {
+  const supabase = await createClient();
+
+  const companies = await fetchAll<Company>((from, to) =>
+    supabase.from("companies").select("*").in("category", DIRECTORY_CATEGORIES).order("name").range(from, to)
+  );
+  if (companies.length === 0) return [];
+
+  const companyIds = new Set(companies.map((c) => c.id));
+
+  const [rollups, allLocations] = await Promise.all([
+    fetchAll<CompanyRollup>((from, to) => supabase.from("company_rollups").select("*").range(from, to)),
+    fetchAll<Location>((from, to) =>
+      supabase.from("locations").select("*").not("company_id", "is", null).order("name").range(from, to)
+    ),
+  ]);
+
+  const locations = allLocations.filter((l) => l.company_id && companyIds.has(l.company_id));
+  const locationById = new Map(locations.map((l) => [l.id, l]));
+
+  const allContacts = await fetchAll<DirectoryContact>((from, to) =>
+    supabase.from("contacts").select("id, location_id, name, title, phone, email").order("name").range(from, to)
+  );
+  const contacts = allContacts.filter((c) => locationById.has(c.location_id));
+
+  return buildDirectoryEntries({ companies, rollups, locations, contacts, search });
+}
+
+// Pure (no I/O) so the matching rules can be unit-tested without a database.
+export function buildDirectoryEntries({
+  companies,
+  rollups,
+  locations,
+  contacts,
+  search,
+}: {
+  companies: Company[];
+  rollups: CompanyRollup[];
+  locations: Location[];
+  contacts: DirectoryContact[];
+  search?: string;
+}): DirectoryEntry[] {
+  const locationById = new Map(locations.map((l) => [l.id, l]));
+  const rollupByCompany = new Map(rollups.map((r) => [r.company_id, r]));
+  const lunchLearnByCompany = summarizeLunchLearn(locations);
+
+  const locationsByCompany = new Map<string, Location[]>();
+  for (const l of locations) {
+    const list = locationsByCompany.get(l.company_id as string) ?? [];
+    list.push(l);
+    locationsByCompany.set(l.company_id as string, list);
+  }
+  const contactsByCompany = new Map<string, DirectoryContact[]>();
+  for (const c of contacts) {
+    const companyId = locationById.get(c.location_id)?.company_id as string;
+    const list = contactsByCompany.get(companyId) ?? [];
+    list.push(c);
+    contactsByCompany.set(companyId, list);
+  }
+
+  const words = (search ?? "")
+    .toLowerCase()
+    .split(/\s+/)
+    .map((w) => w.trim())
+    .filter(Boolean);
+
+  const locationText = (l: Location) => [l.name, l.city, l.address, l.zip, l.state].map(norm).join(" ");
+  const contactText = (c: DirectoryContact) => [c.name, c.title, c.email, c.phone].map(norm).join(" ");
+
+  const entries: DirectoryEntry[] = [];
+  for (const company of companies) {
+    const companyLocations = locationsByCompany.get(company.id) ?? [];
+    const companyContacts = contactsByCompany.get(company.id) ?? [];
+
+    let matchedLocations: Location[] = [];
+    let matchedContacts: DirectoryEntry["matchedContacts"] = [];
+
+    if (words.length > 0) {
+      const haystack = [
+        norm(company.name),
+        ...companyLocations.map(locationText),
+        ...companyContacts.map(contactText),
+      ].join(" | ");
+      if (!words.every((w) => haystack.includes(w))) continue;
+
+      // Surface the specific branches/people behind the match (any word hits) so the
+      // card explains *why* it showed up -- skipped when the firm name alone matched.
+      const nameText = norm(company.name);
+      const nameMatchesAll = words.every((w) => nameText.includes(w));
+      if (!nameMatchesAll) {
+        // Prefer the rows that satisfy EVERY word together with the firm name ("kimley
+        // irvine" -> just the Irvine branch); fall back to any-word hits when no single
+        // row does (e.g. "irvine mike" where the two words live on different rows).
+        const pick = <T,>(rows: T[], text: (row: T) => string) => {
+          const strict = rows.filter((r) => words.every((w) => `${nameText} ${text(r)}`.includes(w)));
+          return strict.length > 0 ? strict : rows.filter((r) => words.some((w) => text(r).includes(w)));
+        };
+        matchedLocations = pick(companyLocations, locationText);
+        const contactFull = (c: DirectoryContact) => {
+          const loc = locationById.get(c.location_id);
+          return `${loc ? locationText(loc) : ""} ${contactText(c)}`;
+        };
+        matchedContacts = pick(companyContacts, contactFull).map((c) => {
+          const loc = locationById.get(c.location_id);
+          return { ...c, locationLabel: loc ? [loc.city, loc.name].filter(Boolean)[0] ?? loc.name : "" };
+        });
+      }
+    }
+
+    entries.push({
+      company,
+      rollup: rollupByCompany.get(company.id),
+      lunchLearn:
+        lunchLearnByCompany.get(company.id) ??
+        ({ status: "none", date: null, branchName: null, branchCity: null } as CompanyLunchLearn),
+      matchedLocations,
+      matchedContacts,
+    });
+  }
+  return entries;
 }

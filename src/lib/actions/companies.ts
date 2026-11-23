@@ -35,6 +35,7 @@ export async function createCompany(_prevState: FormState, formData: FormData): 
   if (error) return { error: error.message };
 
   revalidatePath("/companies");
+  revalidatePath("/contacts");
   revalidatePath("/firms");
   revalidatePath("/contractors");
   if (redirectTo) redirect(redirectTo);
@@ -57,6 +58,7 @@ export async function updateCompany(_prevState: FormState, formData: FormData): 
 
   revalidatePath(`/companies/${id}`);
   revalidatePath("/companies");
+  revalidatePath("/contacts");
   revalidatePath("/firms");
   revalidatePath("/contractors");
   return { success: true };
@@ -74,9 +76,10 @@ export async function deleteCompany(id: string, category: CompanyCategory) {
   if (error) return { error: error.message };
 
   revalidatePath("/companies");
+  revalidatePath("/contacts");
   revalidatePath("/firms");
   revalidatePath("/contractors");
   const destination =
-    category === "distributor" ? "/companies" : category === "contractor" ? "/contractors" : "/firms";
+    category === "distributor" ? "/companies" : category === "contractor" ? "/contacts?type=contractors" : "/contacts?type=firms";
   redirect(destination);
 }

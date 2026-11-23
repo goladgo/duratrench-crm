@@ -2,15 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Briefcase, Building2, HardHat, LayoutDashboard, PlusCircle, Users } from "lucide-react";
+import { Briefcase, Building2, LayoutDashboard, PlusCircle, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/companies", label: "Distributors", icon: Building2 },
   { href: "/visits/new", label: "Log Activity", icon: PlusCircle },
-  { href: "/firms", label: "Firms", icon: Users },
-  { href: "/contractors", label: "Contractors", icon: HardHat },
+  { href: "/contacts", label: "Contacts", icon: Users },
   { href: "/projects", label: "Projects", icon: Briefcase },
 ];
 

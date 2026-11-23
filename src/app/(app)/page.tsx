@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Building2, ChevronLeft, ChevronRight, FileText, HardHat, PlusCircle, Users, Utensils } from "lucide-react";
+import { Building2, ChevronLeft, ChevronRight, FileText, PlusCircle, Users, Utensils } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -31,8 +31,7 @@ const PROJECT_STAGE_VARIANT: Record<ProjectStage, "default" | "secondary" | "des
 
 const SHORTCUTS = [
   { href: "/companies", label: "Distributors", icon: Building2 },
-  { href: "/firms", label: "Design Firms", icon: Users },
-  { href: "/contractors", label: "Contractors", icon: HardHat },
+  { href: "/contacts", label: "Contacts", icon: Users },
   { href: "/reports", label: "Reports", icon: FileText },
 ];
 
