@@ -90,6 +90,10 @@ export interface Project {
   specifying_company_id: string | null;
   winning_opportunity_id: string | null;
   won_at: string | null;
+  odis_id: string | null;
+  odis_status: string | null;
+  odis_price: number | null;
+  odis_follow_up_date: string | null;
   created_at: string;
 }
 

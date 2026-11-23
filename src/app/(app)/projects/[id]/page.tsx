@@ -1,6 +1,14 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getProject, listDesignFirmCompaniesForPicker } from "@/lib/queries/projects";
+import { listQuoteContacts, listQuoteLocations } from "@/lib/queries/quote-locations";
+import { AddProjectQuoteDialog } from "@/components/add-project-quote-dialog";
+import { QuoteContactDialog } from "@/components/quote-contact-dialog";
+import { ImportBiddersCard } from "@/components/import-bidders-card";
+import { BidderWinnerDialog } from "@/components/bidder-winner-dialog";
+import { SoldPriceDialog } from "@/components/sold-price-dialog";
+import { listProjectBidders, type ProjectBidder } from "@/lib/queries/project-bidders";
+import { removeBidder } from "@/lib/actions/project-bidders";
 import { markProjectLost, reopenProject, deleteProject } from "@/lib/actions/projects";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -22,10 +30,28 @@ function formatMoney(value: number | null) {
   return value.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
 }
 
+const BIDDER_GROUPS: { label: string; match: (b: ProjectBidder) => boolean }[] = [
+  { label: "Distributors", match: (b) => b.category === "distributor" },
+  { label: "Contractors", match: (b) => b.category === "contractor" },
+  { label: "Other", match: (b) => b.category !== "distributor" && b.category !== "contractor" },
+];
+
+function bidderCompanyLine(b: ProjectBidder): string {
+  const company = b.companyName ?? "";
+  const branch = company && b.locationName.toLowerCase().includes(company.toLowerCase()) ? b.locationName : company ? `${company} — ${b.locationName}` : b.locationName;
+  return b.city && !branch.includes(b.city) ? `${branch} · ${b.city}` : branch;
+}
+
 export default async function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
-  const [project, designFirms] = await Promise.all([getProject(id), listDesignFirmCompaniesForPicker()]);
+  const [project, designFirms, quoteLocations, quoteContacts, bidders] = await Promise.all([
+    getProject(id),
+    listDesignFirmCompaniesForPicker(),
+    listQuoteLocations(),
+    listQuoteContacts(),
+    listProjectBidders(id),
+  ]);
   if (!project) notFound();
 
   const winningQuote = project.quotes.find((q) => q.id === project.winning_opportunity_id);
@@ -36,6 +62,14 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
         <div className="space-y-2">
           <Badge variant={STAGE_VARIANT[project.stage]}>{project.stage}</Badge>
           <h1 className="text-2xl font-semibold">{project.name}</h1>
+          {project.odis_id && (
+            <p className="text-sm text-muted-foreground">
+              ODIS #{project.odis_id}
+              {project.odis_status ? ` · ${project.odis_status}` : ""}
+              {project.odis_price != null ? ` · ${formatMoney(project.odis_price)}` : ""}
+              {project.odis_follow_up_date ? ` · Follow up ${project.odis_follow_up_date}` : ""}
+            </p>
+          )}
           {project.specifying_company && (
             <Link
               href={`/companies/${project.specifying_company.id}`}
@@ -68,8 +102,14 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
               </p>
               <p className="text-sm text-muted-foreground">
                 {winningQuote.contacts?.name ? `${winningQuote.contacts.name} · ` : ""}
-                {formatMoney(winningQuote.amount)}
+                {winningQuote.amount != null ? `Sold for ${formatMoney(winningQuote.amount)}` : "No sold price yet"}
+                {project.odis_price != null && project.odis_price !== winningQuote.amount
+                  ? ` (estimate ${formatMoney(project.odis_price)})`
+                  : ""}
               </p>
+            </div>
+            <div className="ml-auto">
+              <SoldPriceDialog projectId={project.id} currentAmount={winningQuote.amount} />
             </div>
           </CardContent>
         </Card>
@@ -102,10 +142,96 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
       </Card>
 
       <div className="space-y-3">
-        <h2 className="text-lg font-medium">Quotes ({project.quotes.length})</h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-lg font-medium">Bidders ({bidders.length})</h2>
+          <ImportBiddersCard projectId={project.id} />
+        </div>
+        {bidders.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            No bidders yet. Use Import bidders from ODIS to paste who is bidding this job.
+          </p>
+        ) : (
+          <div className="space-y-4">
+            {BIDDER_GROUPS.map((group) => {
+              const rows = bidders.filter(group.match);
+              if (rows.length === 0) return null;
+              return (
+                <div key={group.label} className="space-y-2">
+                  <h3 className="text-sm font-medium text-muted-foreground">
+                    {group.label} ({rows.length})
+                  </h3>
+                  <div className="divide-y rounded-lg border">
+                    {rows.map((b) => {
+                      const quote =
+                        project.quotes.find((q) => q.location_id === b.locationId && q.contact_id === b.contactId) ??
+                        project.quotes.find((q) => q.location_id === b.locationId);
+                      const isWinner = !!winningQuote && winningQuote.location_id === b.locationId;
+                      return (
+                        <div key={b.id} className="flex flex-wrap items-center justify-between gap-2 px-3 py-3 text-sm">
+                          <div className="min-w-0 space-y-0.5">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Link href={`/locations/${b.locationId}`} className="font-medium hover:underline">
+                                {b.name}
+                              </Link>
+                              {isWinner && <Badge>Winner</Badge>}
+                              {quote && !isWinner && <Badge variant="outline">Quoted</Badge>}
+                            </div>
+                            <p className="text-xs text-muted-foreground">{bidderCompanyLine(b)}</p>
+                            <p className="flex flex-wrap gap-x-3 text-xs text-muted-foreground">
+                              {b.phone && (
+                                <a href={`tel:${b.phone}`} className="hover:underline">
+                                  {b.phone}
+                                </a>
+                              )}
+                              {b.email && (
+                                <a href={`mailto:${b.email}`} className="hover:underline">
+                                  {b.email}
+                                </a>
+                              )}
+                            </p>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-1">
+                            {project.stage === "quoted" && (
+                              <BidderWinnerDialog
+                                projectId={project.id}
+                                bidderId={b.id}
+                                bidderLabel={`${b.name}, ${bidderCompanyLine(b)}`}
+                                defaultPrice={quote?.amount ?? project.odis_price}
+                                otherQuoteCount={project.quotes.length - (quote ? 1 : 0)}
+                              />
+                            )}
+                            <DeleteButton
+                              action={removeBidder}
+                              args={[b.id, project.id]}
+                              confirmMessage={`Remove ${b.name} from the bidders list?`}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-lg font-medium">Quotes ({project.quotes.length})</h2>
+          {project.stage === "quoted" && (
+            <AddProjectQuoteDialog
+              project={{ id: project.id, name: project.name }}
+              locations={quoteLocations}
+              contacts={quoteContacts}
+              defaultAmount={project.odis_price}
+            />
+          )}
+        </div>
         {project.quotes.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No quotes yet — log one from a branch's Quotes tab and pick this project.
+            No quotes yet. Use Add quote to log who quoted it.
           </p>
         ) : (
           <div className="space-y-3">
@@ -133,12 +259,20 @@ export default async function ProjectDetailPage({ params }: { params: Promise<{ 
                     </span>
                     <span>{formatMoney(q.amount)}</span>
                   </div>
-                  {q.contacts?.name && (
-                    <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                      <User className="size-3.5 shrink-0" />
-                      {q.contacts.name}
-                    </p>
-                  )}
+                  <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                    {q.contacts?.name && (
+                      <>
+                        <User className="size-3.5 shrink-0" />
+                        {q.contacts.name}
+                      </>
+                    )}
+                    <QuoteContactDialog
+                      opportunityId={q.id}
+                      locationId={q.location_id}
+                      branchLabel={`${q.locations?.companies?.name ?? "Independent"}${q.locations?.name ? ` — ${q.locations.name}` : ""}`}
+                      currentName={q.contacts?.name ?? null}
+                    />
+                  </div>
                   {q.locations?.id && (
                     <Link href={`/locations/${q.locations.id}`} className="text-sm text-primary hover:underline">
                       View branch
